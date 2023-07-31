@@ -1,0 +1,7 @@
+torch~=1.13.1
+diffusers~=0.19.3
+Pillow~=9.2.0
+invisible_watermark
+transformers
+accelerate
+safetensors
