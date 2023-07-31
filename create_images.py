@@ -1,11 +1,13 @@
 from diffusers import DiffusionPipeline
-# from optimum.intel import OVStableDiffusionPipeline
 import torch
 from PIL import Image
 
-# load both base & refiner
+# Load both base & refiner
 base = DiffusionPipeline.from_pretrained(
-    "stabilityai/stable-diffusion-xl-base-1.0", torch_dtype=torch.float16, variant="fp16", use_safetensors=True
+    "stabilityai/stable-diffusion-xl-base-1.0",
+    torch_dtype=torch.float16,
+    variant="fp16",
+    use_safetensors=True
 )
 
 base.to("cuda")
@@ -28,6 +30,9 @@ path_to_image = r'/home/mansour/ozgranit/traffic-diffusion/kaggle_image/road96.p
 
 # Load the image using PIL
 image = Image.open(path_to_image)
+# Resize the image to 128x128
+desired_size = (128, 128)
+image_resized = image.resize(desired_size, Image.ANTIALIAS)
 
 image = refiner(
     prompt=prompt,
