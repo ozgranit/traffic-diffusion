@@ -67,7 +67,7 @@ class ImageGenerator:
             if item.is_file():
                 # Load the image using PIL
                 original_image = Image.open(item.resolve())
-                self.generate_variations(original_image, item.name)
+                self.generate_variations(original_image, item.name, run_over_existing_images=True)
 
             else:
                 raise IsADirectoryError("Should only find images in the kaggle_images directory")
