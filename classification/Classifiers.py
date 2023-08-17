@@ -1,40 +1,29 @@
-import gc
-import pickle
-import time
 import json
-import cv2
 import os
-import numpy as np
-import torch
-import torch.nn as nn
-from torchvision import transforms
-from torch.utils.data.dataloader import DataLoader
-
-from classification.GtsrbCNN import test_single_image_gtsrb
-from classification.LisaCNN import test_single_image_lisa
+from classification.GtsrbCNN import GtsrbCNN
+from classification.LisaCNN import LisaCNN
 from classification.utils import MODELS_PATH
 
-with open(MODELS_PATH + 'params.json', 'r') as config:
-    params = json.load(config)
-    class_n_gtsrb = params['GTSRB']['class_n']
-    device = params['device']
-    # position_list, _ = load_mask()
-
-with open(MODELS_PATH + 'params.json', 'r') as config:
-    params = json.load(config)
-    class_n_lisa = params['LISA']['class_n']
-    device = params['device']
-    # position_list, _ = load_mask()
+IMAGES_PATH = 'kaggle_images/'
+LISA_GROUND_TRUTH = 12
+GTSRB_GROUND_TRUTH = 14
 
 if __name__ == '__main__':
-    directory = './'
-    for filename in os.listdir(directory):
-        if filename.lower().endswith(('.png', '.jpg')):
-            image_path = os.path.join(directory, filename)
-            print(image_path)
-            test_single_image_gtsrb(image_path, 14, adv_model=False)
-            test_single_image_gtsrb(image_path, 14, adv_model=True)
-            test_single_image_lisa(image_path, 12, adv_model=False)
-            test_single_image_lisa(image_path, 12, adv_model=True)
-            print()
 
+    with open(MODELS_PATH + 'params.json', 'r') as config:
+        params = json.load(config)
+        class_n_gtsrb = params['GTSRB']['class_n']
+        class_n_lisa = params['LISA']['class_n']
+        device = params['device']
+
+    gtsrbCNN = GtsrbCNN(n_class=class_n_gtsrb).to(device)
+    lisaCNN = LisaCNN(n_class=class_n_lisa).to(device)
+    for filename in os.listdir(IMAGES_PATH):
+        if filename.lower().endswith(('.png', '.jpg')):
+            image_path = os.path.join(IMAGES_PATH, filename)
+
+            gtsrbCNN.test_single_image_gtsrb(image_path, GTSRB_GROUND_TRUTH, adv_model=False)
+            gtsrbCNN.test_single_image_gtsrb(image_path, GTSRB_GROUND_TRUTH, adv_model=True)
+            lisaCNN.test_single_image_lisa(image_path, LISA_GROUND_TRUTH, adv_model=False)
+            lisaCNN.test_single_image_lisa(image_path, LISA_GROUND_TRUTH, adv_model=True)
+            print()
