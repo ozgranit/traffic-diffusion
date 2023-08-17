@@ -4,7 +4,8 @@ from PIL import Image
 from pathlib import Path
 from prompts import prompt_getter
 from diffusers import DiffusionPipeline
-
+# from diffusers import StableDiffusionXLImg2ImgPipeline
+# from diffusers import StableDiffusionXLInpaintPipeline
 
 class ImageGenerator:
     def __init__(self):

@@ -3,9 +3,15 @@ import torch
 from PIL import Image
 from pathlib import Path
 from prompts import prompt_getter
+import os
+import torch
+from diffusers import StableDiffusionXLImg2ImgPipeline
+from diffusers import StableDiffusionXLInpaintPipeline
+
+from diffusers.utils import load_image
 from diffusers import DiffusionPipeline
-# from diffusers import StableDiffusionXLImg2ImgPipeline
-# from diffusers import StableDiffusionXLInpaintPipeline
+import torchvision.transforms as transforms
+from PIL import Image
 
 class ImageGenerator:
     def __init__(self):
