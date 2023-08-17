@@ -4,6 +4,7 @@ import pandas as pd
 from classification.utils import Utils
 
 IMAGES_PATH = 'kaggle_images/'
+OUTPUT = ''
 
 if __name__ == '__main__':
     results = []
@@ -17,3 +18,4 @@ if __name__ == '__main__':
             results.append(utils.test_single_image(IMAGES_PATH, filename, 'Lisa', adv_model=True))
 
     df = pd.DataFrame(results)
+    df.to_csv(OUTPUT + 'classification_results.csv', index=False)
