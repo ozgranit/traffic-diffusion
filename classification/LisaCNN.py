@@ -37,7 +37,7 @@ class LisaCNN(nn.Module):
             self.device = params['device']
             # position_list, _ = load_mask()
 
-    def test_single_image_lisa(self, img_path, ground_truth, adv_model=False):
+    def test_single_image(self, img_path, ground_truth, adv_model=False):
         trained_model = LisaCNN(n_class=self.n_class).to(self.device)
         trained_model.load_state_dict(
             torch.load(MODELS_PATH + f'{"adv_" if adv_model else ""}model_lisa.pth',

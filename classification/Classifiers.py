@@ -22,8 +22,8 @@ if __name__ == '__main__':
         if filename.lower().endswith(('.png', '.jpg')):
             image_path = os.path.join(IMAGES_PATH, filename)
 
-            gtsrbCNN.test_single_image_gtsrb(image_path, GTSRB_GROUND_TRUTH, adv_model=False)
-            gtsrbCNN.test_single_image_gtsrb(image_path, GTSRB_GROUND_TRUTH, adv_model=True)
-            lisaCNN.test_single_image_lisa(image_path, LISA_GROUND_TRUTH, adv_model=False)
-            lisaCNN.test_single_image_lisa(image_path, LISA_GROUND_TRUTH, adv_model=True)
+            gtsrbCNN.test_single_image(image_path, GTSRB_GROUND_TRUTH, adv_model=False)
+            gtsrbCNN.test_single_image(image_path, GTSRB_GROUND_TRUTH, adv_model=True)
+            lisaCNN.test_single_image(image_path, LISA_GROUND_TRUTH, adv_model=False)
+            lisaCNN.test_single_image(image_path, LISA_GROUND_TRUTH, adv_model=True)
             print()
