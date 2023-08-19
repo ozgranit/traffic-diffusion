@@ -3,9 +3,11 @@ import numpy as np
 import cv2
 import torch
 import json
+import torch
+import os
 
-from classification.GtsrbCNN import GtsrbCNN
-from classification.LisaCNN import LisaCNN
+from GtsrbCNN import GtsrbCNN
+from LisaCNN import LisaCNN
 MODELS_PATH = 'classification/classification_models/'
 LISA_GROUND_TRUTH = 12
 GTSRB_GROUND_TRUTH = 14
@@ -13,7 +15,7 @@ GTSRB_GROUND_TRUTH = 14
 class Utils:
     def __init__(self):
         self.models = {}
-        self.device = None
+        self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
         self.init_models()
 
     def init_models(self):
@@ -52,17 +54,10 @@ class Utils:
         self.models['lisa'] = lisaCNN
         self.models['lisa_adv'] = lisaCNN_adv
 
-    def test_single_image(self, img_path, img_name, model_name, adv_model=False):
+    def test_single_image(self, img_parent_path, img_name, model_name, adv_model=False):
         model = self.models[model_name.lower() + f'{"_adv" if adv_model else ""}']
-        path = os.path.join(img_path, img_name)
-
-        img = cv2.imread(path)
-        img = cv2.resize(img, (32, 32))
-        if model_name.lower() == 'gtsrb':
-            img = pre_process_image(img).astype(np.float32)
-        img = transforms.ToTensor()(img)
-        img = img.unsqueeze(0).to(self.device)
-
+        img_path = os.path.join(img_parent_path, img_name)
+        img = load_img(self.device, img_path, model_name.lower() == 'gtsrb')
         predict = torch.softmax(model(img)[0], 0)
         index = int(torch.argmax(predict).data)
         confidence = float(predict[index].data)
@@ -72,7 +67,7 @@ class Utils:
 
         result = {
             'name': img_name,
-            'path': img_path,
+            'path': img_parent_path,
             'model': model_name + f'{"_adv" if adv_model else ""}',
             'true_label': model.ground_truth,
             'pred_label': index,
@@ -121,10 +116,13 @@ def transform_image(image, ang_range, shear_range, trans_range, preprocess):
     return image
 
 
-def load_img(device, img_path):
+def load_img(device, img_path, apply_pre_process):
     img = cv2.imread(img_path)
     img = cv2.resize(img, (32, 32))
-    img = pre_process_image(img).astype(np.float32)
+    if apply_pre_process:
+        img = pre_process_image(img).astype(np.float32)
     img = transforms.ToTensor()(img)
     img = img.unsqueeze(0).to(device)
+
     return img
+
