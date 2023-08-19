@@ -8,6 +8,7 @@ class LisaCNN(nn.Module):
 
     def __init__(self, n_class, ground_truth, adv_model):
         super().__init__()
+        self.model_name = 'LISA'
         self.n_class = n_class
         self.adv_model = adv_model
         self.ground_truth = ground_truth

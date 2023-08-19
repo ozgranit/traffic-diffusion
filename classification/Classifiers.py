@@ -3,6 +3,8 @@ import os
 import pandas as pd
 from classification.utils import Utils
 
+from utils import MODELS_PATH
+
 IMAGES_PATH = 'kaggle_images/'
 OUTPUT = ''
 

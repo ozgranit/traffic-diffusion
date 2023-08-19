@@ -1,11 +1,12 @@
+from torchvision import transforms
+import numpy as np
 import cv2
 import torch
 import json
 
 from classification.GtsrbCNN import GtsrbCNN
 from classification.LisaCNN import LisaCNN
-
-MODELS_PATH = 'classification_models/'
+MODELS_PATH = 'classification/classification_models/'
 LISA_GROUND_TRUTH = 12
 GTSRB_GROUND_TRUTH = 14
 
@@ -120,5 +121,10 @@ def transform_image(image, ang_range, shear_range, trans_range, preprocess):
     return image
 
 
-
-
+def load_img(device, img_path):
+    img = cv2.imread(img_path)
+    img = cv2.resize(img, (32, 32))
+    img = pre_process_image(img).astype(np.float32)
+    img = transforms.ToTensor()(img)
+    img = img.unsqueeze(0).to(device)
+    return img

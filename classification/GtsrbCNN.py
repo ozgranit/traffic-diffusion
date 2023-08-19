@@ -1,15 +1,17 @@
 import json
-import cv2
-import numpy as np
 import torch
 from torch import nn
 from torchvision import transforms
+
+from classification.utils import load_img
+from utils import MODELS_PATH
 
 
 class GtsrbCNN(nn.Module):
     def __init__(self, n_class, ground_truth, adv_model):
 
         super().__init__()
+        self.model_name = 'GTSRB'
         self.n_class = n_class
         self.adv_model = adv_model
         self.ground_truth = ground_truth
