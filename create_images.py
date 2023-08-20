@@ -1,44 +1,25 @@
 import torch
-
+import gc
 from PIL import Image
 from pathlib import Path
 from prompts import prompt_getter
-from diffusers import DiffusionPipeline
+from diffusers import StableDiffusionDepth2ImgPipeline
 
 
 class ImageGenerator:
     def __init__(self):
-        # Load both base & refiner
-
-        base = DiffusionPipeline.from_pretrained(
-            "stabilityai/stable-diffusion-xl-base-1.0",
-            torch_dtype=torch.float32,
-            variant="fp16",
-            use_safetensors=True
-        )
-
-        base.to("cuda")
-        self.refiner = DiffusionPipeline.from_pretrained(
-            "stabilityai/stable-diffusion-xl-refiner-1.0",
-            text_encoder_2=base.text_encoder_2,
-            vae=base.vae,
-            torch_dtype=torch.float32,
-            use_safetensors=True,
-            variant="fp16",
-        )
-        self.refiner.to("cuda")
+        self.pipe = StableDiffusionDepth2ImgPipeline.from_pretrained(
+            "stabilityai/stable-diffusion-2-depth",
+            torch_dtype=torch.float16,
+        ).to("cuda")
 
     def generate_image(self, original_image, prompt):
-        # Define how many steps and what % of steps to be run on each expert (80/20) here
-        n_steps = 40
-        high_noise_frac = 0.8
+        torch.cuda.empty_cache()
+        gc.collect()
 
-        new_image = self.refiner(
-            prompt=prompt,
-            num_inference_steps=n_steps,
-            denoising_start=high_noise_frac,
-            image=original_image,
-        ).images[0]
+        strength = 0.45
+        new_image =self.pipe(prompt="A photo, " + prompt, image=original_image,
+                             negative_prompt="Cartoon, Disfigured, blurry, unrealistic", strength=strength).images[0]
 
         return new_image
 
@@ -66,7 +47,7 @@ class ImageGenerator:
 
             if item.is_file():
                 # Load the image using PIL
-                original_image = Image.open(item.resolve())
+                original_image = Image.open(item.resolve()).convert("RGB")
                 self.generate_variations(original_image, item.name, run_over_existing_images=True)
 
             else:
