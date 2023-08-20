@@ -1,0 +1,7 @@
+name,path,model,true_label,pred_label,success,pred_score
+road66_sd_16.png,generated_images/road66,Lisa,12,12,True,0.21169207990169525
+road66_sd_17.png,generated_images/road66,Lisa,12,12,True,0.16504251956939697
+road66_sd_3.png,generated_images/road66,Lisa,12,12,True,0.17928795516490936
+road66_sd_5.png,generated_images/road66,Lisa,12,12,True,0.19109614193439484
+road66_sd_7.png,generated_images/road66,Lisa,12,12,True,0.2561396062374115
+road66_sd_9.png,generated_images/road66,Lisa,12,12,True,0.2081335335969925
