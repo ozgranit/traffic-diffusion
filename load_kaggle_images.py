@@ -43,11 +43,14 @@ def process_image(image_folder: str, annotation_folder: str, attack_db: str, cro
     labels = []
     bbx = []
 
-    for xml_file in os.listdir(annotation_folder):
+    #for xml_file in os.listdir(annotation_folder):
+    for xml_file in sorted(os.listdir(annotation_folder), key=lambda name: int(name.split('_')[1].split('.')[0])):  #os.listdir(annotation_folder):
         if xml_file.endswith('.xml'):
             img_file_name_without_ext = xml_file[:-4]
             image_filename = img_file_name_without_ext + '.png'
             image_path = os.path.join(image_folder, image_filename)
+            if not os.path.exists(image_path):
+                image_path = image_path[:-4] + '.jpg'
             annotation_path = os.path.join(annotation_folder, xml_file)
 
             if os.path.exists(image_path) and os.path.exists(annotation_path):
