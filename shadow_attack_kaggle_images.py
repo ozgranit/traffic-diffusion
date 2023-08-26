@@ -208,7 +208,8 @@ def attack_physical(attack_db):
                                                                                       'kaggle_annotations',
                                                                                       attack_db, crop_size=224)  # /workspace/traffic-diffusion/
     cnt_attacked = 0
-    ind = file_names.index("road66")
+    img_name = "road53"
+    ind = file_names.index(img_name)
     print(file_names[ind])
 
     # image_path = r'kaggle_images/road66.png'
@@ -224,15 +225,16 @@ def attack_physical(attack_db):
     target_image = cv2.resize(image, (size, size))
     # target_image = cv2.resize(
     #     cv2.imread(image_path), (224, 224))
-    generated_dir_path = r'generated_images/road66'
+    generated_dir_path = f'dataset_images/{img_name}.png'   #generated_images/road53'
     generated_imgs_cropped = load_generated_augmentations(generated_dir_path, bbx[ind], to_size=size)
-    output_dir='tmp'
+    output_dir='tmp6_a'
     os.makedirs(output_dir, exist_ok=True)
     pos_list = np.where(mask_image.sum(axis=2) > 0)
-
+    generated_images = None #generated_imgs_cropped
+    transform_num = 43
     # EOT is included in the first stage
     adv_img, _, _ = attack(target_image, image_label, pos_list,
-                           physical_attack=True, transform_num=10, generated_images=generated_imgs_cropped)
+                           physical_attack=True, transform_num=transform_num, generated_images=generated_images)#generated_imgs_cropped
 
     cv2.imwrite(f'./{output_dir}/temp.bmp', adv_img)
     if attack_db == 'LISA':
@@ -247,7 +249,7 @@ def attack_physical(attack_db):
     print("part b-------------------------------------------------")
     # Predict stabilization
     adv_img, _, _ = attack(target_image, image_label, pos_list, targeted_attack=True,
-                           physical_attack=True, target=predict, transform_num=10, generated_images=generated_imgs_cropped)
+                           physical_attack=True, target=predict, transform_num=transform_num, generated_images=generated_images) #generated_imgs_cropped
 
     cv2.imwrite(f'./{output_dir}/adv_img.png', adv_img)
     if attack_db == 'LISA':
@@ -267,6 +269,7 @@ def attack_physical(attack_db):
     # cv2.waitKey(0)
     with open(f'./{output_dir}/results.txt', 'w') as f:
         f.write(msg)
+        f.write('\n')
         f.write(summary_msg)
     print("output dir: ", output_dir)
 
