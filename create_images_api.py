@@ -7,7 +7,7 @@ import numpy as np
 import os
 import requests
 import random
-from prompts import prompt_getter
+from prompts import prompt_getter, NEGATIVE_PROMPT
 
 TOKENS = ['key-Q4LlVmmwFRFeT5ptbudZY0Ie8dZ914myzh122y3m40zyZurJWcpOVI4bbsRNRfOm5PFMRhdQYKIFommMadEmkBalIf4zbj9',
           'key-31ffFs5sAm0frJBhYw3Otcw4PpyurGUZBcdzgbZfLS2E1VHb0tscb6MfX9aahh4srcNPIGi8W3qdFCkTonQQIevkADcDZIjo',
@@ -87,16 +87,14 @@ def generate_images(original_images):
             # convert the image to base64 encoding
             _, buffer = cv2.imencode('.jpg', image)
             base64_image = base64.b64encode(buffer).decode('utf-8')
-            negative_prompt = 'Unrealistic, cartoon, blurry, paint, childish, low quality, low resolution'
-            # negative_prompt = 'Unrealistic, cartoon, disney, colorful'
 
             data['model'] = 'stable-diffusion-xl-v1-0'
             data['image'] = base64_image
             data['prompt'] = cur_prompt
-            data['negative_prompt'] = negative_prompt
+            data['negative_prompt'] = NEGATIVE_PROMPT
             data['strength'] = 0.5
             data['steps'] = 10
-            data['guidance'] = 11
+            data['guidance'] = 10
             data['seed'] = seed
             headers['Authorization'] = 'Bearer ' + bearer_token
 
@@ -143,6 +141,7 @@ def generate_images(original_images):
 
 
 if __name__ == "__main__":
-    images_to_filter = [0, 1, 2, 3, 4, 5, 6, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26]
+    # images_to_filter = [0, 1, 2, 3, 4, 5, 6, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26]
+    images_to_filter = []
     original_images = load_images(INPUT_FOLDER, images_to_filter)
     generate_images(original_images)
