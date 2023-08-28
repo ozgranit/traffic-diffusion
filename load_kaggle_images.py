@@ -6,6 +6,9 @@ import xml.etree.ElementTree as ET
 import matplotlib.pyplot as plt
 from collections import Counter
 import sys
+
+import numpy as np
+
 sys.path.append('ShadowAttack')
 from ShadowAttack.shadow_attack import attack
 from ShadowAttack.utils import brightness, judge_mask_type, load_mask
@@ -45,14 +48,16 @@ def process_image(image_folder, annotation_folder, attack_db):
     for xml_file in os.listdir(annotation_folder):
         if xml_file.endswith('.xml'):
             img_file_name_without_ext = xml_file[:-4]
-            image_filename = img_file_name_without_ext + '.png'
+            image_filename = img_file_name_without_ext + '.jpg'
             image_path = os.path.join(image_folder, image_filename)
             annotation_path = os.path.join(annotation_folder, xml_file)
 
             if os.path.exists(image_path) and os.path.exists(annotation_path):
                 image = cv2.imread(image_path)
                 annotations = load_annotations(annotation_path)
-
+                if image_masks is not None:
+                    image_mask = np.load(image_masks + '/' + img_file_name_without_ext + '.npy')
+                    image[~image_mask] = 0
                 for xmin, ymin, xmax, ymax, label in annotations:
                     if label == "stop":  # Filter annotations with name "stop"
                         cropped_img = crop_image(image, xmin, ymin, xmax, ymax)
