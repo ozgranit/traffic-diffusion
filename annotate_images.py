@@ -56,7 +56,7 @@ def create_annotations(image_name, image_shape, annotations, xml_path = 'larger_
 
     tree.write(xml_path + image_name.split('.')[0] + '.xml')
 
-def process_image(images_folder, annotation_folder):
+def annotate_images(images_folder, annotation_folder):
     file_names = []
     orig_imgs = []
     cropped_imgs = []
@@ -99,4 +99,4 @@ def process_image(images_folder, annotation_folder):
 if __name__ == "__main__":
     images_folder = 'larger_images/image_inputs'
     annotation_folder = 'larger_images/image_annotations'
-    process_image(images_folder, annotation_folder)
+    annotate_images(images_folder, annotation_folder)

@@ -25,3 +25,4 @@ prompt_getter = {
 }
 
 NEGATIVE_PROMPT = "Cartoon, Disfigured, Blurry, Unrealistic"
+# NEGATIVE_PROMPT = 'Unrealistic, cartoon, blurry, paint, childish, low quality, low resolution'
