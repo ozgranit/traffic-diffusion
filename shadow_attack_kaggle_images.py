@@ -153,7 +153,6 @@ def attack(with_EOT, attack_image, label, coords, targeted_attack=False, physica
 
     return adv_image, succeed, num_query, Shadow(global_best_position, coords, shadow_level, coefficient)
 
-
 def attack_digital(attack_db: str = "LISA"):
     shadow_level = 0.5  # Replace with the desired shadow level
     # position_list, mask_list = load_params()
@@ -192,7 +191,6 @@ def attack_digital(attack_db: str = "LISA"):
     print("Attack finished! Success rate: ", end='')
     print(Counter(map(lambda x: x[:-4].split('_')[-1],
                       os.listdir(save_dir)))['True'] / len(os.listdir(save_dir)))
-
 
 def load_generated_augmentations(dir_path, bbx, to_size=32):
     generated_imgs = []
@@ -360,8 +358,8 @@ def attack_physical(attack_db):
     # mask_path = r'ShadowAttack/tmp/gtsrb_30_mask.png'
     mask_path = r'octagon_mask.png'
     size=224
-    transform_num_for_normal_attack = 10#43
-    transform_num_for_special_attack =10#43
+    transform_num_for_normal_attack = 14#43
+    transform_num_for_special_attack =2#43
     with_EOT = True
     mask_image = cv2.resize(
         cv2.imread(mask_path, cv2.IMREAD_UNCHANGED), (size, size))
@@ -498,7 +496,6 @@ def check_and_save_final_attacked_image(adv_img, attack_db, image_label, output_
         summary_msg = 'Attack succeed! Try to implement it in the real world.'
         print(summary_msg)
     return msg, summary_msg
-
 
 def add_shadow_attack_to_image(shadow_params_normal, test_image):
     test_image_shadow, shadow_area = draw_shadow(
