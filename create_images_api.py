@@ -7,10 +7,9 @@ import numpy as np
 import os
 import requests
 import random
-from prompts import prompt_getter
+from prompts import prompt_getter, NEGATIVE_PROMPT
 
-TOKENS = ['key-3grAbPupFXlLHuEgAhiZK4biKTR7w1mpvFJR6A22ZDmlceFF2HbZnaWtYGDa2Ja4rPD61IaDegZpjQ2SBe2RX4TYggBwiBTq',
-          'key-Q4LlVmmwFRFeT5ptbudZY0Ie8dZ914myzh122y3m40zyZurJWcpOVI4bbsRNRfOm5PFMRhdQYKIFommMadEmkBalIf4zbj9',
+TOKENS = ['key-Q4LlVmmwFRFeT5ptbudZY0Ie8dZ914myzh122y3m40zyZurJWcpOVI4bbsRNRfOm5PFMRhdQYKIFommMadEmkBalIf4zbj9',
           'key-31ffFs5sAm0frJBhYw3Otcw4PpyurGUZBcdzgbZfLS2E1VHb0tscb6MfX9aahh4srcNPIGi8W3qdFCkTonQQIevkADcDZIjo',
           'key-nW3E6RoU5x6r5Wf6SPXdalHFUrXP2eBXkb8kpL7WMpJc54JOTiT9UIE8Jph9HHB6EEfO6jTDvfYUYkBJpsSrnmUfTKEZuuO',
           'key-1ApfAS0MprJ98FJJaOUYUCeZwHsI5n9tcFJzNRiSm7cQN3CsyRYJ7rvIPtRnHEfCcG6ozNoesB7GW5AeWWuhVQQMMFfp5i0Z',
@@ -92,10 +91,10 @@ def generate_images(original_images):
             data['model'] = 'stable-diffusion-xl-v1-0'
             data['image'] = base64_image
             data['prompt'] = cur_prompt
-            data['negative_prompt'] = 'Unrealistic, cartoon, blurry'
-            data['strength'] = 0.6
-            data['steps'] = 30
-            data['guidance'] = 18
+            data['negative_prompt'] = NEGATIVE_PROMPT
+            data['strength'] = 0.5
+            data['steps'] = 10
+            data['guidance'] = 10
             data['seed'] = seed
             headers['Authorization'] = 'Bearer ' + bearer_token
 
@@ -123,9 +122,10 @@ def generate_images(original_images):
                 cv2.imshow(filename, cv_image)
                 cv2.waitKey(0)
                 cv2.destroyAllWindows()
+
                 print(response_json['cost'])
-                print('Current cost:', response_json['cost'], 'Total cost:', total_cost)
                 total_cost += response_json['cost']
+                print('Current cost:', response_json['cost'], 'Total cost:', total_cost)
             else:
                 error_json = json.loads(response.text)
                 print("Request failed:", error_json['error']['code'])
@@ -141,6 +141,7 @@ def generate_images(original_images):
 
 
 if __name__ == "__main__":
-    images_to_filter = [0, 1, 2, 3, 4, 10]
+    # images_to_filter = [0, 1, 2, 3, 4, 5, 6, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26]
+    images_to_filter = []
     original_images = load_images(INPUT_FOLDER, images_to_filter)
     generate_images(original_images)
