@@ -71,7 +71,7 @@ class ImageGenerator:
                 self.generate_variations(original_image, item.name, run_over_existing_images=True)
 
             else:
-                raise IsADirectoryError("Should only find images in the kaggle_images directory")
+                raise IsADirectoryError("Should only find images_orig in the kaggle_images directory")
 
 
 if __name__ == "__main__":

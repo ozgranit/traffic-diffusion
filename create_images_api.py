@@ -47,14 +47,14 @@ def generate_images(original_images):
     url = URL_BASE + URL_SUFFIX
     total_cost = 0
 
-    # replace with output_folder = OUTPUT_FOLDER, just so we won't overwrite the original images
+    # replace with output_folder = OUTPUT_FOLDER, just so we won't overwrite the original images_orig
     output_folder = 'larger_images/temp_output_images/'
     os.makedirs(output_folder, exist_ok=True)
 
     # strength -    Indicates how much to transform the reference image. When strength is 1, initial image will be
     #               ignored. Technically, strength parameter indicates how much noise add to the image.
     #               Minimum value is 0, maximum value is 1. Default value is 0.5.
-    # steps -       The number of denoising steps. More steps usually can produce higher quality images,
+    # steps -       The number of denoising steps. More steps usually can produce higher quality images_orig,
     #               but take more time to generate. Number of steps is modulated by strength.
     #               Notice that more steps = more cost, so don't abuse it.
     #               Minimum value is 1, maximum value is 100. Default value is 50

@@ -4,11 +4,11 @@ def explore_total_physical_attack_results(results_path):
     parent_dir = os.path.split(results_path)[0]
     output_path = os.path.join(parent_dir, 'result_summary.csv')
     results = pd.read_csv(results_path)
-    output_df = pd.DataFrame(columns=['total_inputs(diff orig images)', 'total_generated_imgs', "total_test_images",
+    output_df = pd.DataFrame(columns=['total_inputs(diff orig images_orig)', 'total_generated_imgs', "total_test_images",
                                       'total_adv_gen_attack_succeeded_normal', 'avg_prob_gen_attack_succeeded_normal', 'acc_normal', 'count_greater_than_zero_normal',
                                       'total_adv_gen_attack_succeeded_special', 'avg_prob_gen_attack_succeeded_special', 'acc_special', 'count_greater_than_zero_special'])
     total_inputs = len(results)
-    print("total inputs (different orig images): ", total_inputs)
+    print("total inputs (different orig images_orig): ", total_inputs)
     total_gen_test = results['total_generated_imgs'][0].item()
     print("total_generated_imgs: ", total_gen_test)
     total_test_images_variations = len(results) * total_gen_test

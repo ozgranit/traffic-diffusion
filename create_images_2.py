@@ -2,7 +2,7 @@ import torch
 from diffusers import StableDiffusionXLImg2ImgPipeline
 from diffusers.utils import load_image
 
-"""another way to generate images which I have not tested yet"""
+"""another way to generate images_orig which I have not tested yet"""
 
 
 pipe = StableDiffusionXLImg2ImgPipeline.from_pretrained(
