@@ -6,9 +6,12 @@ import xml.etree.ElementTree as ET
 import matplotlib.pyplot as plt
 from collections import Counter
 import sys
+
+import numpy as np
+
 sys.path.append('ShadowAttack')
-# from ShadowAttack.shadow_attack import attack
-# from ShadowAttack.utils import brightness, judge_mask_type, load_mask
+from ShadowAttack.shadow_attack import attack
+from ShadowAttack.utils import brightness, judge_mask_type, load_mask
 
 # LISA stop sign label is: 12
 # GTSRB stop sign label is: 14
@@ -35,7 +38,7 @@ def load_annotations(xml_path):
     return annotations
 
 
-def process_image(image_folder: str, annotation_folder: str, attack_db: str, crop_size: int = 32):
+def process_image(image_folder: str, annotation_folder: str, attack_db: str, crop_size: int = 32, mask_folder: str = None):
     file_names = []
     orig_imgs = []
     cropped_imgs = []
@@ -60,6 +63,10 @@ def process_image(image_folder: str, annotation_folder: str, attack_db: str, cro
                 for xmin, ymin, xmax, ymax, label in annotations:
                     if label == "stop":  # Filter annotations with name "stop"
                         cropped_img = crop_image(image, xmin, ymin, xmax, ymax)
+                        if mask_folder is not None:
+                            image_mask = np.load(mask_folder + '/' + img_file_name_without_ext + '.npy')
+                            image_mask = np.where(image_mask, 'white', 'black')
+                            cropped_mask = crop_image(image_mask, xmin, ymin, xmax, ymax)
                         label_value = 12 if attack_db == 'LISA' else 14
 
                         file_names.append(img_file_name_without_ext)
@@ -73,6 +80,8 @@ def process_image(image_folder: str, annotation_folder: str, attack_db: str, cro
                         labels.append(label_value)
                         bbx.append([xmin, ymin, xmax, ymax])
 
+    if mask_folder is not None:
+        return file_names, orig_imgs, cropped_imgs, cropped_resized_imgs, labels, bbx, cropped_mask
     return file_names, orig_imgs, cropped_imgs, cropped_resized_imgs, labels, bbx
 
 

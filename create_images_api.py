@@ -92,9 +92,9 @@ def generate_images(original_images):
             data['image'] = base64_image
             data['prompt'] = cur_prompt
             data['negative_prompt'] = NEGATIVE_PROMPT
-            data['strength'] = 0.5
+            data['strength'] = 0.7
             data['steps'] = 10
-            data['guidance'] = 10
+            data['guidance'] = 17
             data['seed'] = seed
             headers['Authorization'] = 'Bearer ' + bearer_token
 
@@ -123,7 +123,7 @@ def generate_images(original_images):
                 cv2.waitKey(0)
                 cv2.destroyAllWindows()
 
-                print(response_json['cost'])
+                print('Prompt:', prompt_desc, 'Cost:', response_json['cost'])
                 total_cost += response_json['cost']
                 print('Current cost:', response_json['cost'], 'Total cost:', total_cost)
             else:
