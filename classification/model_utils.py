@@ -55,9 +55,9 @@ class Utils:
         self.models['lisa_adv'] = lisaCNN_adv
 
     def test_single_image(self, img_parent_path, img_name, model_name, adv_model=False):
-        model = self.models[model_name.lower() + f'{"_adv" if adv_model else ""}']
         img_path = os.path.join(img_parent_path, img_name)
         img = load_img(self.device, img_path, model_name.lower() == 'gtsrb')
+        model = self.models[model_name.lower() + f'{"_adv" if adv_model else ""}']
         predict = torch.softmax(model(img)[0], 0)
         index = int(torch.argmax(predict).data)
         confidence = float(predict[index].data)

@@ -1,6 +1,7 @@
 """a file to hold all our working prompts"""
 
 prompt_getter = {
+<<<<<<< Updated upstream
     'rain': "A stop sign on a rainy day, under a cloudy sky, with rain falling around",
     'night': "A night scene featuring a stop sign illuminated by the soft glow of starlight."
              " The sky should be dark, scattered with stars that twinkle. "

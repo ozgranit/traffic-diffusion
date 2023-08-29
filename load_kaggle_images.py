@@ -6,12 +6,9 @@ import xml.etree.ElementTree as ET
 import matplotlib.pyplot as plt
 from collections import Counter
 import sys
-
-import numpy as np
-
 sys.path.append('ShadowAttack')
-from ShadowAttack.shadow_attack import attack
-from ShadowAttack.utils import brightness, judge_mask_type, load_mask
+# from ShadowAttack.shadow_attack import attack
+# from ShadowAttack.utils import brightness, judge_mask_type, load_mask
 
 # LISA stop sign label is: 12
 # GTSRB stop sign label is: 14
@@ -38,26 +35,28 @@ def load_annotations(xml_path):
     return annotations
 
 
-def process_image(image_folder, annotation_folder, attack_db):
+def process_image(image_folder: str, annotation_folder: str, attack_db: str, crop_size: int = 32):
     file_names = []
     orig_imgs = []
     cropped_imgs = []
     cropped_resized_imgs = []
     labels = []
+    bbx = []
 
-    for xml_file in os.listdir(annotation_folder):
+    #for xml_file in os.listdir(annotation_folder):
+    for xml_file in sorted(os.listdir(annotation_folder), key=lambda name: int(name.split('_')[1].split('.')[0])):  #os.listdir(annotation_folder):
         if xml_file.endswith('.xml'):
             img_file_name_without_ext = xml_file[:-4]
-            image_filename = img_file_name_without_ext + '.jpg'
+            image_filename = img_file_name_without_ext + '.png'
             image_path = os.path.join(image_folder, image_filename)
+            if not os.path.exists(image_path):
+                image_path = image_path[:-4] + '.jpg'
             annotation_path = os.path.join(annotation_folder, xml_file)
 
             if os.path.exists(image_path) and os.path.exists(annotation_path):
                 image = cv2.imread(image_path)
                 annotations = load_annotations(annotation_path)
-                if image_masks is not None:
-                    image_mask = np.load(image_masks + '/' + img_file_name_without_ext + '.npy')
-                    image[~image_mask] = 0
+
                 for xmin, ymin, xmax, ymax, label in annotations:
                     if label == "stop":  # Filter annotations with name "stop"
                         cropped_img = crop_image(image, xmin, ymin, xmax, ymax)
@@ -68,12 +67,13 @@ def process_image(image_folder, annotation_folder, attack_db):
                         cropped_imgs.append(cropped_img)
 
                         # Resize cropped image to 32x32
-                        cropped_resized = cv2.resize(cropped_img, (32, 32))
+                        cropped_resized = cv2.resize(cropped_img, (crop_size, crop_size))
 
                         cropped_resized_imgs.append(cropped_resized)
                         labels.append(label_value)
+                        bbx.append([xmin, ymin, xmax, ymax])
 
-    return file_names, orig_imgs, cropped_imgs, cropped_resized_imgs, labels
+    return file_names, orig_imgs, cropped_imgs, cropped_resized_imgs, labels, bbx
 
 
 def plot_images(original, cropped):
@@ -141,7 +141,7 @@ def plot_triple_images_and_adv(original, cropped, resized_cropped, adv_img):
 
 if __name__ == "__main__":
     attack_db = "LISA"  # # Replace with "LISA" or "GTSRB" depending on your use case, Replace with the actual attack database
-    file_names, orig_imgs, cropped_imgs, cropped_resized_imgs, labels = process_image('kaggle_images',
+    file_names, orig_imgs, cropped_imgs, cropped_resized_imgs, labels, bbx = process_image('kaggle_images',
                                                                 'kaggle_annotations', attack_db)
     index=2
     plot_triple_images(orig_imgs[index], cropped_imgs[index], cropped_resized_imgs[index])
