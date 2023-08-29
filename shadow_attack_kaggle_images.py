@@ -353,16 +353,16 @@ def attack_physical(attack_db):
                                                                                            # /workspace/traffic-`diffusion/
                                                                                            'larger_images/image_annotations',
                                                                                            attack_db, crop_size=224)  # /workspace/traffic-diffusion/
-    parent_dir = f'larger_images/physical_attack'
+    parent_dir = f'larger_images/physical_attack_with_EOT'
     image_label = 12#14#1#12
     cnt_attacked = 0
     df_results = pd.DataFrame(columns=DF_RESULTS_COLUMNS)
     # mask_path = r'ShadowAttack/tmp/gtsrb_30_mask.png'
     mask_path = r'octagon_mask.png'
     size=224
-    transform_num_for_normal_attack = 2#43
-    transform_num_for_special_attack =2#43
-    with_EOT = False
+    transform_num_for_normal_attack = 10#43
+    transform_num_for_special_attack =10#43
+    with_EOT = True
     mask_image = cv2.resize(
         cv2.imread(mask_path, cv2.IMREAD_UNCHANGED), (size, size))
     mask_image = np.expand_dims(mask_image, axis=-1)
