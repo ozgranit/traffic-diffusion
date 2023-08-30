@@ -10,6 +10,11 @@ for type in GENERATED_IMAGES_TYPES_TEST:
                    f'gen_{type}_special_pred_label', f'gen_{type}_special_pred_prob']
     DF_RESULTS_COLUMNS+=gen_columns
 
+    gen_columns = [f'gen_{type}_2_clean_pred_label', f'gen_{type}_2_clean_pred_prob',
+                   f'gen_{type}_2_normal_pred_label', f'gen_{type}_2_normal_pred_prob',
+                   f'gen_{type}_2_special_pred_label', f'gen_{type}_2_special_pred_prob']
+    DF_RESULTS_COLUMNS+=gen_columns
+
 DF_RESULTS_COLUMNS += ['total_generated_imgs']
 DF_RESULTS_COLUMNS += ['total_adv_gen_attack_succeeded_normal', 'avg_prob_gen_attack_succeeded_normal', 'total_gen_failed_normal']
 DF_RESULTS_COLUMNS += ['total_adv_gen_attack_succeeded_special', 'avg_prob_gen_attack_succeeded_special', 'total_gen_failed_special']
