@@ -10,8 +10,8 @@ import sys
 import numpy as np
 
 sys.path.append('ShadowAttack')
-from ShadowAttack.shadow_attack import attack
-from ShadowAttack.utils import brightness, judge_mask_type, load_mask
+# from ShadowAttack.shadow_attack import attack
+# from ShadowAttack.utils import brightness, judge_mask_type, load_mask
 
 # LISA stop sign label is: 12
 # GTSRB stop sign label is: 14
@@ -65,7 +65,7 @@ def process_image(image_folder: str, annotation_folder: str, attack_db: str, cro
                         cropped_img = crop_image(image, xmin, ymin, xmax, ymax)
                         if mask_folder is not None:
                             image_mask = np.load(mask_folder + '/' + img_file_name_without_ext + '.npy')
-                            image_mask = np.where(image_mask, 'white', 'black')
+                            image_mask = np.where(image_mask, 255, 0).astype(np.uint8)
                             cropped_mask = crop_image(image_mask, xmin, ymin, xmax, ymax)
                         label_value = 12 if attack_db == 'LISA' else 14
 
@@ -150,8 +150,8 @@ def plot_triple_images_and_adv(original, cropped, resized_cropped, adv_img):
 
 if __name__ == "__main__":
     attack_db = "LISA"  # # Replace with "LISA" or "GTSRB" depending on your use case, Replace with the actual attack database
-    file_names, orig_imgs, cropped_imgs, cropped_resized_imgs, labels, bbx = process_image('kaggle_images',
-                                                                'kaggle_annotations', attack_db)
+    file_names, orig_imgs, cropped_imgs, cropped_resized_imgs, labels, bbx = process_image('larger_images/image_inputs',
+                                                                'larger_images/image_annotations', attack_db, 32, 'larger_images/image_masks')
     index=2
     plot_triple_images(orig_imgs[index], cropped_imgs[index], cropped_resized_imgs[index])
     print("label {labels[index]}")

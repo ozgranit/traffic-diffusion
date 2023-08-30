@@ -9,8 +9,7 @@ import requests
 import random
 from prompts import prompt_getter, NEGATIVE_PROMPT
 
-TOKENS = ['key-Q4LlVmmwFRFeT5ptbudZY0Ie8dZ914myzh122y3m40zyZurJWcpOVI4bbsRNRfOm5PFMRhdQYKIFommMadEmkBalIf4zbj9',
-          'key-31ffFs5sAm0frJBhYw3Otcw4PpyurGUZBcdzgbZfLS2E1VHb0tscb6MfX9aahh4srcNPIGi8W3qdFCkTonQQIevkADcDZIjo',
+TOKENS = ['key-31ffFs5sAm0frJBhYw3Otcw4PpyurGUZBcdzgbZfLS2E1VHb0tscb6MfX9aahh4srcNPIGi8W3qdFCkTonQQIevkADcDZIjo',
           'key-nW3E6RoU5x6r5Wf6SPXdalHFUrXP2eBXkb8kpL7WMpJc54JOTiT9UIE8Jph9HHB6EEfO6jTDvfYUYkBJpsSrnmUfTKEZuuO',
           'key-1ApfAS0MprJ98FJJaOUYUCeZwHsI5n9tcFJzNRiSm7cQN3CsyRYJ7rvIPtRnHEfCcG6ozNoesB7GW5AeWWuhVQQMMFfp5i0Z',
           'key-38Hgtd7b7rpE47jNGYi3T8JwnSvnSQp58qz2wtEvJtL3W3NAu7iVS5YKwwtg8hJKARjDVBaL0fGixxyV6MrbI2IbvKgIJO4s',
@@ -47,7 +46,7 @@ def generate_images(original_images):
     total_cost = 0
 
     # replace with output_folder = OUTPUT_FOLDER, just so we won't overwrite the original images_orig
-    output_folder = 'larger_images/temp_output_images/'
+    output_folder = 'larger_images/image_outputs/'
     os.makedirs(output_folder, exist_ok=True)
 
     # strength -    Indicates how much to transform the reference image. When strength is 1, initial image will be
@@ -77,65 +76,73 @@ def generate_images(original_images):
         "Content-Type": "application/json"
     }
 
+    max_retries = 5
+
     breaker = False
     received_images = []
     for index, (filename, image) in enumerate(original_images.items()):
         for prompt_desc, cur_prompt in prompt_getter.items():
-            seed = random.randint(1, 2147483647)
-            bearer_token = TOKENS[0]
+            retry_count = 0
+            while retry_count < max_retries:
+                seed = random.randint(1, 2147483647)
+                bearer_token = TOKENS[0]
 
-            # convert the image to base64 encoding
-            _, buffer = cv2.imencode('.jpg', image)
-            base64_image = base64.b64encode(buffer).decode('utf-8')
+                # convert the image to base64 encoding
+                _, buffer = cv2.imencode('.jpg', image)
+                base64_image = base64.b64encode(buffer).decode('utf-8')
 
-            data['model'] = 'stable-diffusion-xl-v1-0'
-            data['image'] = base64_image
-            data['prompt'] = cur_prompt
-            data['negative_prompt'] = NEGATIVE_PROMPT
-            data['strength'] = 0.7
-            data['steps'] = 10
-            data['guidance'] = 17
-            data['seed'] = seed
-            headers['Authorization'] = 'Bearer ' + bearer_token
+                data['model'] = 'stable-diffusion-xl-v1-0'
+                data['image'] = base64_image
+                data['prompt'] = cur_prompt
+                data['negative_prompt'] = NEGATIVE_PROMPT
+                data['strength'] = 0.7
+                data['steps'] = 10
+                data['guidance'] = 17
+                data['seed'] = seed
+                headers['Authorization'] = 'Bearer ' + bearer_token
 
-            response = requests.post(url, json=data, headers=headers)
-            if response.status_code == 200:
-                cur_output_folder = output_folder + filename
-                os.makedirs(cur_output_folder, exist_ok=True)
-                cur_output_folder += '/'
-                output_filename = prompt_desc + '.jpg'
+                response = requests.post(url, json=data, headers=headers)
+                if response.status_code == 200:
+                    cur_output_folder = output_folder + filename
+                    os.makedirs(cur_output_folder, exist_ok=True)
+                    cur_output_folder += '/'
+                    output_filename = prompt_desc + '_2.jpg'
 
-                response_json = response.json()
+                    response_json = response.json()
 
-                # Extract the base64 encoded image string from the JSON response
-                base64_image_string = response_json["image"]
+                    # Extract the base64 encoded image string from the JSON response
+                    base64_image_string = response_json["image"]
 
-                # decode the base64 image string to bytes
-                image_bytes = base64.b64decode(base64_image_string)
+                    # decode the base64 image string to bytes
+                    image_bytes = base64.b64decode(base64_image_string)
 
-                # convert the image bytes to a np array and decode into an OpenCV image
-                image_array = np.frombuffer(image_bytes, np.uint8)
-                cv_image = cv2.imdecode(image_array, cv2.IMREAD_COLOR)
-                received_images.append(cv_image)
-                cv2.imwrite(cur_output_folder + output_filename, cv_image)
+                    # convert the image bytes to a np array and decode into an OpenCV image
+                    image_array = np.frombuffer(image_bytes, np.uint8)
+                    cv_image = cv2.imdecode(image_array, cv2.IMREAD_COLOR)
+                    received_images.append(cv_image)
+                    cv2.imwrite(cur_output_folder + output_filename, cv_image)
 
-                cv2.imshow(filename, cv_image)
-                cv2.waitKey(0)
-                cv2.destroyAllWindows()
+                    # cv2.imshow(filename, cv_image)
+                    # cv2.waitKey(0)
+                    # cv2.destroyAllWindows()
 
-                print('Prompt:', prompt_desc, 'Cost:', response_json['cost'])
-                total_cost += response_json['cost']
-                print('Current cost:', response_json['cost'], 'Total cost:', total_cost)
-            else:
-                error_json = json.loads(response.text)
-                print("Request failed:", error_json['error']['code'])
-                if error_json['error']['code'] == 'quota_exceeded':
-                    print('Trying the next token...')
-                    TOKENS.pop(0)
-                if len(TOKENS) == 0:
-                    print('No more tokens to try, exiting...')
-                    breaker = True
+                    print('Filename:', filename, 'Prompt:', prompt_desc, 'Cost:', response_json['cost'])
+                    total_cost += response_json['cost']
+                    print('Current cost:', response_json['cost'], 'Total cost:', total_cost)
                     break
+                else:
+                    retry_count += 1
+                    error_json = json.loads(response.text)
+                    print("Request failed:", error_json['error']['code'])
+                    if error_json['error']['code'] == 'quota_exceeded':
+                        print('Trying the next token...')
+                        TOKENS.pop(0)
+                    if len(TOKENS) == 0:
+                        print('No more tokens to try, exiting...')
+                        breaker = True
+                        break
+            if breaker:
+                break
         if breaker:
             break
 
