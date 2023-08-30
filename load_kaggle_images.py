@@ -62,7 +62,7 @@ def process_image(image_folder: str, annotation_folder: str, attack_db: str, cro
                         cropped_img = crop_image(image, xmin, ymin, xmax, ymax)
                         if mask_folder is not None:
                             image_mask = np.load(mask_folder + '/' + img_file_name_without_ext + '.npy')
-                            image_mask = np.where(image_mask, 'white', 'black')
+                            image_mask = np.where(image_mask, 255, 0).astype(np.uint8)
                             cropped_mask = crop_image(image_mask, xmin, ymin, xmax, ymax)
                         label_value = 12 if attack_db == 'LISA' else 14
 

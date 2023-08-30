@@ -1,10 +1,9 @@
 """a file to hold all our working prompts"""
 
 prompt_getter = {
-<<<<<<< Updated upstream
     'rain': "A stop sign on a rainy day, under a cloudy sky, with rain falling around",
     'night': "A night scene featuring a stop sign illuminated by the soft glow of starlight."
-             " The sky should be dark, scattered with stars that twinkle. "
+             "The sky should be dark, scattered with stars that twinkle. "
              "The surroundings should show a dark night, creating a serene and enchanting nighttime ambiance.",
     'snow': "A winter scene where a stop sign is positioned along a snowy road. "
             "The landscape should be covered in a thick layer of white snow. "
