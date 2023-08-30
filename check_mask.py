@@ -4,7 +4,7 @@ import cv2
 import numpy as np
 from matplotlib import pyplot as plt
 
-from load_kaggle_images import plot_images, process_image
+from load_images import plot_images, process_image
 
 
 def check_octagon_mask():

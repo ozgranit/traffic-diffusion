@@ -18,7 +18,7 @@ from ShadowAttack.utils import pre_process_image, draw_shadow, shadow_edge_blur
 from ShadowAttack import lisa, gtsrb
 from ShadowAttack.pso import PSO
 from settings import GENERATED_IMAGES_TYPES_TRAIN, GENERATED_IMAGES_TYPES_TEST, DF_RESULTS_COLUMNS
-from load_kaggle_images import process_image, plot_triple_images_and_adv, crop_image
+from load_images import process_image, plot_triple_images_and_adv, crop_image
 from plot_images import plot_2_images_in_a_row
 from shadow import Shadow
 
@@ -208,8 +208,8 @@ def load_generated_augmentations(dir_path, bbx, to_size=32):
 def load_generated_augmentations_by_type(types: str, dir_path: str, bbx: List[int], to_size: int =32):
     generated_imgs = []
     generated_imgs_names = []
-    for img_name in os.listdir(dir_path):
-        if img_name.lower().endswith(('jpg','png')) and img_name[:-4] in types:
+    for img_name in sorted(os.listdir(dir_path)):
+        if img_name.lower().endswith(('jpg','png')) and img_name[:-4].split('_')[0] in types:
             # img_file_name_without_ext = img_file[:-4]
             # image_filename = img_file_name_without_ext + '.png'
             image_path = os.path.join(dir_path, img_name)
@@ -322,7 +322,7 @@ def predict_image(image, description="", print_results=True, attack_db='LISA'):
 
         return predict_.max(1)
 
-def calculate_average_prob(lst, true_label, desired_wrong_label):
+def calculate_average_prob(lst, true_label, desired_wrong_label=None):
     total_desired_wrong_predictions = 0
     total_prob_sum = 0 # of desired wrong pred
     total_true_label = 0
@@ -330,9 +330,14 @@ def calculate_average_prob(lst, true_label, desired_wrong_label):
     for type_name, pred_label, pred_prob in lst:
         if pred_label == true_label:  # meaning attack failed
             total_true_label += 1
-        elif pred_label == desired_wrong_label:
+        # elif desired_wrong_label is not None and pred_label == desired_wrong_label:
+        #     total_desired_wrong_predictions += 1
+        #     total_prob_sum += pred_prob
+        else:
             total_desired_wrong_predictions += 1
             total_prob_sum += pred_prob
+
+
 
 
     if total_desired_wrong_predictions > 0:
@@ -433,18 +438,18 @@ def attack_physical(attack_db):
 
             test_image_shadow_normal = add_shadow_attack_to_image(shadow_params_normal, gen_test_image)
             test_image_shadow_normal_predict = predict_image(test_image_shadow_normal, "test_image_shadow_normal")
-            test_gen_normal_preds.append([gen_type, test_image_shadow_normal_predict[1].item(), test_image_shadow_normal_predict[0].item()])
-            cv2.imwrite(f'./{output_dir_normal}/{gen_type}_adv_normal.png', test_image_shadow_normal)
+            test_gen_normal_preds.append([generated_imgs_test_cropped_names[gen_ind], test_image_shadow_normal_predict[1].item(), test_image_shadow_normal_predict[0].item()])
+            cv2.imwrite(f'./{output_dir_normal}/{generated_imgs_test_cropped_names[gen_ind]}_adv_normal.png', test_image_shadow_normal)
 
             test_image_shadow_special = add_shadow_attack_to_image(shadow_params_special, gen_test_image)
             test_image_shadow_special_predict = predict_image(test_image_shadow_special, "test_image_shadow_special", print_results=False)
-            test_gen_special_preds.append([gen_type, test_image_shadow_special_predict[1].item(), test_image_shadow_special_predict[0].item()])
-            cv2.imwrite(f'./{output_dir_special}/{gen_type}_adv_special.png', test_image_shadow_special)
+            test_gen_special_preds.append([generated_imgs_test_cropped_names[gen_ind], test_image_shadow_special_predict[1].item(), test_image_shadow_special_predict[0].item()])
+            cv2.imwrite(f'./{output_dir_special}/{generated_imgs_test_cropped_names[gen_ind]}_adv_special.png', test_image_shadow_special)
 
             df_result_row += [test_image_clean_predict[1].item(), test_image_clean_predict[0].item(),
                               test_image_shadow_normal_predict[1].item(), test_image_shadow_normal_predict[0].item(),
                               test_image_shadow_special_predict[1].item(), test_image_shadow_special_predict[0].item()]
-            plot_2_images_in_a_row(cv2.cvtColor(test_image_shadow_normal, cv2.COLOR_BGR2RGB), cv2.cvtColor(test_image_shadow_special, cv2.COLOR_BGR2RGB), "test_image_shadow_normal", "test_image_shadow_special", save_path=os.path.join(output_dir, f'{gen_type}_adv_cmp.png'), plot=False)
+            plot_2_images_in_a_row(cv2.cvtColor(test_image_shadow_normal, cv2.COLOR_BGR2RGB), cv2.cvtColor(test_image_shadow_special, cv2.COLOR_BGR2RGB), "test_image_shadow_normal", "test_image_shadow_special", save_path=os.path.join(output_dir, f'{generated_imgs_test_cropped_names[gen_ind]}_adv_cmp.png'), plot=False)
 
         # Calculate total summary for each attack row on generated images:
         with open(os.path.join(output_dir_normal, 'gen_results.json'), 'w') as json_file:
@@ -490,7 +495,7 @@ def attack_physical_untargeted_only(attack_db):
                                                                                            # /workspace/traffic-`diffusion/
                                                                                            'larger_images/image_annotations',
                                                                                            attack_db, crop_size=224, mask_folder=r'larger_images/image_masks')  # /workspace/traffic-diffusion/
-    parent_dir = f'larger_images/physical_attack_untar_mask_only_3_train_3_test_tmp'
+    parent_dir = f'larger_images/physical_attack_untar_mask_equal_split'
     image_label = 12#14#1#12
     cnt_attacked = 0
     df_results = pd.DataFrame(columns=DF_RESULTS_COLUMNS)
@@ -566,25 +571,32 @@ def attack_physical_untargeted_only(attack_db):
             test_gen_normal_preds, test_gen_special_preds = [], []
         # Apply shadow to test image
 
+
         for gen_type in GENERATED_IMAGES_TYPES_TEST:
-            gen_ind = GENERATED_IMAGES_TYPES_TEST.index(gen_type)
-            gen_test_image = generated_imgs_test_cropped[gen_ind]
-            test_image_clean_predict = predict_image(gen_test_image, "test_image_clean_predict")
+            # for i in range(1,3):
+            #     gen_ind=0
+            #
+            gen_ind = generated_imgs_test_cropped_names.index(gen_type)
+            for i in range(1,3):
+                # gen_ind = GENERATED_IMAGES_TYPES_TEST.index(gen_type)
+                gen_test_image = generated_imgs_test_cropped[gen_ind]
+                test_image_clean_predict = predict_image(gen_test_image, "test_image_clean_predict")
 
-            test_image_shadow_normal = add_shadow_attack_to_image(shadow_params_normal, gen_test_image)
-            test_image_shadow_normal_predict = predict_image(test_image_shadow_normal, "test_image_shadow_normal")
-            test_gen_normal_preds.append([gen_type, test_image_shadow_normal_predict[1].item(), test_image_shadow_normal_predict[0].item()])
-            cv2.imwrite(f'./{output_dir_normal}/{gen_type}_adv_normal.png', test_image_shadow_normal)
+                test_image_shadow_normal = add_shadow_attack_to_image(shadow_params_normal, gen_test_image)
+                test_image_shadow_normal_predict = predict_image(test_image_shadow_normal, "test_image_shadow_normal")
+                test_gen_normal_preds.append([generated_imgs_test_cropped_names[gen_ind], test_image_shadow_normal_predict[1].item(), test_image_shadow_normal_predict[0].item()])
+                cv2.imwrite(f'./{output_dir_normal}/{generated_imgs_test_cropped_names[gen_ind]}_adv_normal.png', test_image_shadow_normal)
 
-            test_image_shadow_special = add_shadow_attack_to_image(shadow_params_special, gen_test_image)
-            test_image_shadow_special_predict = predict_image(test_image_shadow_special, "test_image_shadow_special", print_results=False)
-            test_gen_special_preds.append([gen_type, test_image_shadow_special_predict[1].item(), test_image_shadow_special_predict[0].item()])
-            cv2.imwrite(f'./{output_dir_special}/{gen_type}_adv_special.png', test_image_shadow_special)
+                test_image_shadow_special = add_shadow_attack_to_image(shadow_params_special, gen_test_image)
+                test_image_shadow_special_predict = predict_image(test_image_shadow_special, "test_image_shadow_special", print_results=False)
+                test_gen_special_preds.append([generated_imgs_test_cropped_names[gen_ind], test_image_shadow_special_predict[1].item(), test_image_shadow_special_predict[0].item()])
+                cv2.imwrite(f'./{output_dir_special}/{generated_imgs_test_cropped_names[gen_ind]}_adv_special.png', test_image_shadow_special)
 
-            df_result_row += [test_image_clean_predict[1].item(), test_image_clean_predict[0].item(),
-                              test_image_shadow_normal_predict[1].item(), test_image_shadow_normal_predict[0].item(),
-                              test_image_shadow_special_predict[1].item(), test_image_shadow_special_predict[0].item()]
-            plot_2_images_in_a_row(cv2.cvtColor(test_image_shadow_normal, cv2.COLOR_BGR2RGB), cv2.cvtColor(test_image_shadow_special, cv2.COLOR_BGR2RGB), "test_image_shadow_normal", "test_image_shadow_special", save_path=os.path.join(output_dir, f'{gen_type}_adv_cmp.png'), plot=False)
+                df_result_row += [test_image_clean_predict[1].item(), test_image_clean_predict[0].item(),
+                                  test_image_shadow_normal_predict[1].item(), test_image_shadow_normal_predict[0].item(),
+                                  test_image_shadow_special_predict[1].item(), test_image_shadow_special_predict[0].item()]
+                plot_2_images_in_a_row(cv2.cvtColor(test_image_shadow_normal, cv2.COLOR_BGR2RGB), cv2.cvtColor(test_image_shadow_special, cv2.COLOR_BGR2RGB), "test_image_shadow_normal", "test_image_shadow_special", save_path=os.path.join(output_dir, f'{generated_imgs_test_cropped_names[gen_ind]}_adv_cmp.png'), plot=False)
+                gen_ind+=1
 
         # Calculate total summary for each attack row on generated images:
         with open(os.path.join(output_dir_normal, 'gen_results.json'), 'w') as json_file:
@@ -594,7 +606,7 @@ def attack_physical_untargeted_only(attack_db):
 
         total_desired_wrong_predictions_normal, average_prob_normal, total_true_label_normal = calculate_average_prob(test_gen_normal_preds, true_label, adv_img_normal_predict[1].item())
         total_desired_wrong_predictions_special, average_prob_special, total_true_label_special = calculate_average_prob(test_gen_special_preds, true_label, adv_img_special_predict[1].item())
-        df_result_row += [len(GENERATED_IMAGES_TYPES_TEST)]
+        df_result_row += [len(GENERATED_IMAGES_TYPES_TEST)*2]
         df_result_row += [total_desired_wrong_predictions_normal, average_prob_normal, total_true_label_normal]
         df_result_row += [total_desired_wrong_predictions_special, average_prob_special, total_true_label_special]
 
