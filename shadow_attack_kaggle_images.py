@@ -490,7 +490,7 @@ def attack_physical_untargeted_only(attack_db):
                                                                                            # /workspace/traffic-`diffusion/
                                                                                            'larger_images/image_annotations',
                                                                                            attack_db, crop_size=224, mask_folder=r'larger_images/image_masks')  # /workspace/traffic-diffusion/
-    parent_dir = f'larger_images/physical_attack_untar_mask_only_3_train_3_test'
+    parent_dir = f'larger_images/physical_attack_untar_mask_only_3_train_3_test_tmp'
     image_label = 12#14#1#12
     cnt_attacked = 0
     df_results = pd.DataFrame(columns=DF_RESULTS_COLUMNS)

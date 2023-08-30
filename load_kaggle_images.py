@@ -42,6 +42,7 @@ def process_image(image_folder: str, annotation_folder: str, attack_db: str, cro
     cropped_resized_imgs = []
     labels = []
     bbx = []
+    cropped_resized_masks = []
 
     #for xml_file in os.listdir(annotation_folder):
     for xml_file in sorted(os.listdir(annotation_folder), key=lambda name: int(name.split('_')[1].split('.')[0])):  #os.listdir(annotation_folder):
@@ -64,6 +65,9 @@ def process_image(image_folder: str, annotation_folder: str, attack_db: str, cro
                             image_mask = np.load(mask_folder + '/' + img_file_name_without_ext + '.npy')
                             image_mask = np.where(image_mask, 255, 0).astype(np.uint8)
                             cropped_mask = crop_image(image_mask, xmin, ymin, xmax, ymax)
+                            cropped_resized_mask = cv2.resize(cropped_mask, (crop_size, crop_size))
+                            cropped_resized_masks.append(cropped_resized_mask)
+
                         label_value = 12 if attack_db == 'LISA' else 14
 
                         file_names.append(img_file_name_without_ext)
@@ -78,7 +82,7 @@ def process_image(image_folder: str, annotation_folder: str, attack_db: str, cro
                         bbx.append([xmin, ymin, xmax, ymax])
 
     if mask_folder is not None:
-        return file_names, orig_imgs, cropped_imgs, cropped_resized_imgs, labels, bbx, cropped_mask
+        return file_names, orig_imgs, cropped_imgs, cropped_resized_imgs, labels, bbx, cropped_resized_masks
     return file_names, orig_imgs, cropped_imgs, cropped_resized_imgs, labels, bbx
 
 
