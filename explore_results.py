@@ -45,5 +45,5 @@ def explore_total_physical_attack_results(results_path):
     output_df.to_csv(output_path)
 
 if __name__ == "__main__":
-    path = r'/tmp/pycharm_project_392/larger_images/physical_attack_with_EOT/results.csv'
+    path = r'/tmp/pycharm_project_392/larger_images/physical_attack_untar_mask_equal_split/results.csv'
     explore_total_physical_attack_results(path)
