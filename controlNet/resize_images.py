@@ -4,12 +4,12 @@ import torch
 import torchvision.transforms.functional as TF
 
 # Input and output directories
-input_folder = "controlNet/conditioning_images_orig"
-output_folder = "controlNet/conditioning_images"
+input_folder = "controlNet/images_orig"
+output_folder = "controlNet/images"
 os.makedirs(output_folder, exist_ok=True)
 
 # Target size
-target_size = (512, 512)
+target_size = (1024, 1024)
 
 # Iterate through images_orig in the input folder
 for image_name in os.listdir(input_folder):
@@ -34,7 +34,7 @@ for image_name in os.listdir(input_folder):
 
         # Resize the image using torch interpolation
         image_tensor = TF.to_tensor(image)
-        resized_tensor = torch.nn.functional.interpolate(image_tensor.unsqueeze(0), size=(512, 512), mode="bilinear", align_corners=False)
+        resized_tensor = torch.nn.functional.interpolate(image_tensor.unsqueeze(0), size=target_size, mode="bilinear", align_corners=False)
         resized_image = TF.to_pil_image(resized_tensor.squeeze())
 
         # Save the resized image

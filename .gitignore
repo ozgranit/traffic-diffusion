@@ -6,3 +6,12 @@
 /ShadowAttack/tmp/
 /ShadowAttack/tmp_backup/
 /classification_on_generated/
+
+.idea/
+/controlNet/
+/tmp/
+/tmp1/
+/tmp2/
+/tmp4/
+/tmp6_a/
+/dataset_images/

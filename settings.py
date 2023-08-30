@@ -1,5 +1,5 @@
-GENERATED_IMAGES_TYPES_TRAIN = ['midday', 'cloud', 'rain', 'dawn']
-GENERATED_IMAGES_TYPES_TEST = ['night', 'snow'] # 'dawn',
+GENERATED_IMAGES_TYPES_TRAIN = ['midday', 'cloud', 'rain']
+GENERATED_IMAGES_TYPES_TEST = ['night', 'snow', 'dawn']
 GENERATED_IMAGES_TYPES_ALL = GENERATED_IMAGES_TYPES_TRAIN + GENERATED_IMAGES_TYPES_TEST
 DF_RESULTS_COLUMNS = ['img_name', 'label', 'clean_pred_label', 'clean_pred_prob',
                       'adv_normal_pred_label', 'adv_normal_pred_prob',
