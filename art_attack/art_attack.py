@@ -6,7 +6,6 @@ The parameters are chosen for reduced computational requirements of the script a
 """
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 import torch.optim as optim
 import numpy as np
 
@@ -15,44 +14,21 @@ from art.estimators.classification import PyTorchClassifier
 from art.utils import load_cifar10
 
 
-# Step 0: Define the neural network model, return logits instead of activation in forward method
-
-
-class Net(nn.Module):
-    def __init__(self):
-        super(Net, self).__init__()
-        self.conv_1 = nn.Conv2d(in_channels=1, out_channels=4, kernel_size=5, stride=1)
-        self.conv_2 = nn.Conv2d(in_channels=4, out_channels=10, kernel_size=5, stride=1)
-        self.fc_1 = nn.Linear(in_features=4 * 4 * 10, out_features=100)
-        self.fc_2 = nn.Linear(in_features=100, out_features=10)
-
-    def forward(self, x):
-        x = F.relu(self.conv_1(x))
-        x = F.max_pool2d(x, 2, 2)
-        x = F.relu(self.conv_2(x))
-        x = F.max_pool2d(x, 2, 2)
-        x = x.view(-1, 4 * 4 * 10)
-        x = F.relu(self.fc_1(x))
-        x = self.fc_2(x)
-        return x
-
-
-LISA_NUM_OF_CLASSES = 16
-
-
 def load_lisa_model():
     from ShadowAttack import lisa
     device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
     model = lisa.LisaCNN(n_class=LISA_NUM_OF_CLASSES).to(device)
-    model.load_state_dict(torch.load(f'ShadowAttack/model/model_lisa.pth',
-                          map_location=torch.device(device)))
+    model.load_state_dict(torch.load(f'../ShadowAttack/model/model_lisa.pth',
+                                     map_location=torch.device(device)))
     model.eval()
     return model
 
 # Step 1: Load the MNIST dataset
 
 (x_train, y_train), (x_test, y_test), min_pixel_value, max_pixel_value = load_cifar10()
-
+LISA_NUM_OF_CLASSES = 16
+min_pixel_value = 0
+max_pixel_value = 255
 # Step 1a: Swap axes to PyTorch's NCHW format
 
 x_train = np.transpose(x_train, (0, 3, 1, 2)).astype(np.float32)
@@ -80,7 +56,7 @@ classifier = PyTorchClassifier(
 
 # Step 4: Train the ART classifier
 
-classifier.fit(x_train, y_train, batch_size=64, nb_epochs=3)
+# classifier.fit(x_train, y_train, batch_size=64, nb_epochs=3)
 
 # Step 5: Evaluate the ART classifier on benign test examples
 
