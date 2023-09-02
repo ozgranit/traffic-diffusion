@@ -330,8 +330,9 @@ def test_single_image(img_path, label, adv_model=False):
 
     print(f'Correct: {index==label}', end=' ')
     print(f'Predict: {index} Confidence: {confidence*100}%')
+    msg = f'Correct: {index==label}\nPredict: {index} Confidence: {confidence*100}%'
 
-    return index, index == label
+    return index, index == label, msg
 
 
 if __name__ == '__main__':

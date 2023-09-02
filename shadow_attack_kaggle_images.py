@@ -497,7 +497,8 @@ def attack_physical_untargeted_only(attack_db):
                                                                                            # /workspace/traffic-`diffusion/
                                                                                            'larger_images/image_annotations',
                                                                                            attack_db, crop_size=224, mask_folder=r'larger_images/image_masks')  # /workspace/traffic-diffusion/
-    parent_dir = f'larger_images/physical_attack_untar_mask_equal_split_{attack_db}'
+    with_EOT = False
+    parent_dir = f'larger_images/physical_attack_untar_mask_equal_split_{attack_db}_EOT-{with_EOT}_iter-{iter_num}'
     image_label = 12 if attack_db=="LISA" else 14
     cnt_attacked = 0
     df_results = pd.DataFrame(columns=DF_RESULTS_COLUMNS)
@@ -506,7 +507,6 @@ def attack_physical_untargeted_only(attack_db):
     size=224
     transform_num_for_normal_attack = 0#14#43
     transform_num_for_special_attack =0#2#43
-    with_EOT = False
     # mask_image = cv2.resize(
     #     cv2.imread(mask_path, cv2.IMREAD_UNCHANGED), (size, size))
     # img_name = "road_1"
@@ -642,7 +642,7 @@ def check_and_save_final_attacked_image(adv_img, attack_db, image_label, output_
         predict, failed, msg = lisa.test_single_image(
             f'./{output_dir}/adv_img.png', image_label, target_model == "robust")
     else:
-        predict, failed = gtsrb.test_single_image(
+        predict, failed, msg = gtsrb.test_single_image(
             f'./{output_dir}/adv_img.png', image_label, target_model == "robust")
     if failed:
         summary_msg = 'Attack failed! Try to run again.'
