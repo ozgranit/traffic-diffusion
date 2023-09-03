@@ -113,7 +113,8 @@ def image_generator(size: int = 32):
     def generate_test(image_dir):
         return load_generated_augmentations_by_type(GENERATED_IMAGES_TYPES_TEST, image_dir, bbx[i], to_size=size)
 
-    traffic_diffusion_dir = Path.cwd().parent
+    traffic_diffusion_dir = Path.cwd()
+    assert traffic_diffusion_dir.name == 'traffic-diffusion', 'got the wrong folder'
     larger_images_dir = traffic_diffusion_dir / 'larger_images'
 
     file_names, _, _, cropped_images, _, bbx, _ = process_image(str(larger_images_dir / 'image_inputs'),
