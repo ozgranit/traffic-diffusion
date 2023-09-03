@@ -24,7 +24,7 @@ from ShadowAttack.utils import draw_shadow
 from ShadowAttack.utils import shadow_edge_blur
 from ShadowAttack.utils import judge_mask_type
 from ShadowAttack.utils import load_mask
-
+from ShadowAttack.config import PARAMS_PATH
 # with open('ShadowAttack/params.json', 'r') as config:
 with open(PARAMS_PATH, 'r') as config:
     params = json.load(config)
