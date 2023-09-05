@@ -1,0 +1,23 @@
+<annotation>
+    <folder>images</folder>
+    <filename>road_2.jpg</filename>
+    <size>
+        <width>1155</width>
+        <height>800</height>
+        <depth>3</depth>
+    </size>
+    <segmented>0</segmented>
+    <object>
+        <name>stop</name>
+        <pose>Unspecified</pose>
+        <truncated>0</truncated>
+        <occluded>0</occluded>
+        <difficult>0</difficult>
+        <bndbox>
+            <xmin>503</xmin>
+            <ymin>20</ymin>
+            <xmax>749</xmax>
+            <ymax>277</ymax>
+        </bndbox>
+    </object>
+</annotation>

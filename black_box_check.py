@@ -3,12 +3,14 @@ import torch
 import cv2
 import pandas as pd
 import numpy as np
-from ShadowAttack import lisa, gtsrb
-from ShadowAttack.utils import pre_process_image
+from attacks.ShadowAttack import gtsrb, lisa
+from attacks.ShadowAttack.utils import pre_process_image
 from torchvision import transforms
 import json
 
-with open('ShadowAttack/params.json', 'rb') as f:
+from settings import GTSRB, LISA
+
+with open('attacks/ShadowAttack/params.json', 'rb') as f:
     params = json.load(f)
     class_n_gtsrb = params['GTSRB']['class_n']
     class_n_lisa = params['LISA']['class_n']
@@ -52,15 +54,15 @@ def load_model(attack_db):
     if attack_db == "LISA":
         model = lisa.LisaCNN(n_class=class_n_lisa).to(device)
         model.load_state_dict(
-            # torch.load(f'ShadowAttack/model/{"adv_" if target_model == "robust" else ""}model_lisa.pth',
-            torch.load(f'ShadowAttack/model/{"adv_" if target_model == "robust" else ""}model_lisa.pth',
+            # torch.load(f'{MODEL_PATH}/{"adv_" if target_model == "robust" else ""}model_lisa.pth',
+            torch.load(f'{MODEL_PATH}/{"adv_" if target_model == "robust" else ""}model_lisa.pth',
                        map_location=torch.device(device)))
         pre_process = transforms.Compose([transforms.ToTensor()])
     else:
         model = gtsrb.GtsrbCNN(n_class=class_n_gtsrb).to(device)
         model.load_state_dict(
-            # torch.load(f'ShadowAttack/model/{"adv_" if target_model == "robust" else ""}model_gtsrb.pth',
-            torch.load(f'ShadowAttack/model/{"adv_" if target_model == "robust" else ""}model_gtsrb.pth',
+            # torch.load(f'{MODEL_PATH}/{"adv_" if target_model == "robust" else ""}model_gtsrb.pth',
+            torch.load(f'{MODEL_PATH}/{"adv_" if target_model == "robust" else ""}model_gtsrb.pth',
                        map_location=torch.device(device)))
         pre_process = transforms.Compose([
             pre_process_image, transforms.ToTensor()])
@@ -83,7 +85,7 @@ def inference_on_experiment(base_dir, model_name):
     # Create a DataFrame to store results
     total_imgs = 0
     total_src_imgs = 0
-    total_imgs_atatcked = 0
+    total_imgs_attacked = 0
     total_gen_imgs = 0
     total_gen_imgs_attacked = 0
 
@@ -105,8 +107,8 @@ def inference_on_experiment(base_dir, model_name):
             # Initialize a dictionary to store results for this road
             road_results = {"road": subdir}
 
-            # Iterate through image folders 'normal_attack' and 'special_attack'
-            for attack_type in ['normal_atatck', 'special_atatck']:
+            # Iterate through image folders ATTACK_TYPE_A and ATTACK_TYPE_B
+            for attack_type in [ATTACK_TYPE_A, ATTACK_TYPE_B]:
                 attack_path = os.path.join(subdir_path, attack_type)
                 if os.path.exists(attack_path):
                     # Iterate through the images in the list
@@ -136,7 +138,7 @@ def inference_on_experiment(base_dir, model_name):
                             road_results[column_name_prob] = 1 if column_name_label != ORIG_LABEL else 0
                             road_results[f"{column_name_label}_Type"] = attack_type  # Add attack type info
                             if label != ORIG_LABEL:
-                                total_imgs_atatcked+=1
+                                total_imgs_attacked+=1
                                 if image_type != SRC_IMAGE:
                                     total_gen_imgs_attacked+=1
                                     if 'normal' in attack_type:
@@ -161,7 +163,7 @@ def inference_on_experiment(base_dir, model_name):
 
     print("total_imgs:", total_imgs)
     print("total_src_imgs: ", total_src_imgs)
-    print("total_imgs_atatcked:", total_imgs_atatcked)
+    print("total_imgs_attacked:", total_imgs_attacked)
     print("total_gen_imgs:", total_gen_imgs)
     print("total_gen_imgs_attacked:", total_gen_imgs_attacked)
 
@@ -179,7 +181,12 @@ if __name__ == "__main__":
     # experiment_dir = r'larger_images/physical_attack_untar_mask_equal_split_GTSRB_EOT-False_iter-300'
 
     # # Checking LISA attack on GTSRB
-    model_name = 'GTSRB'
-    experiment_dir = r'/tmp/pycharm_project_250/larger_images/physical_attack_untar_mask_equal_split_LISA_EOT-False_iter-200'
+    model_name = GTSRB | LISA
+    experiment_dir = r'/tmp/pycharm_project_250/larger_images/experiments/physical_attack_untargeted_mask_equal_split_LISA_EOT-False_iter-200_level-0.43'
 
-    inference_on_experiment(experiment_dir, model_name)
+    attack_method = ATTACK_TYPE_A     #"normal_atatck
+    inference_on_experiment(experiment_dir, model_name, attack_method)
+
+    attack_method = ATTACK_TYPE_B     #"special_atatck
+    inference_on_experiment(experiment_dir, model_name, attack_method)
+

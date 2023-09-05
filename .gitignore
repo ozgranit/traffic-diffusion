@@ -14,9 +14,9 @@
 /tmp2/
 /tmp4/
 /tmp6_a/
-/dataset_images/
+/datasets/kaggle/dataset_images/
 
 __pycache__/
 *.pyc
 
-RFLA/test_images/0c7ac4a8c9dfa802.png
+attacks/RFLA/test_images/0c7ac4a8c9dfa802.png

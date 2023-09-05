@@ -2,9 +2,10 @@
 import json
 import torch
 from torchvision import transforms
-from ShadowAttack import lisa, gtsrb
-from ShadowAttack.config import PARAMS_PATH, GTSRB, LISA
-from ShadowAttack.utils import pre_process_image
+from attacks.ShadowAttack import gtsrb, lisa
+from attacks.ShadowAttack.shadow_attack_settings import PARAMS_PATH, MODEL_PATH
+from attacks.ShadowAttack.utils import pre_process_image
+from settings import GTSRB, LISA
 
 
 def load_model(attack_db = GTSRB, attack_type = 'physical', target_model = 'normal'):
@@ -34,15 +35,15 @@ def load_model(attack_db = GTSRB, attack_type = 'physical', target_model = 'norm
     if attack_db == LISA:
         model = lisa.LisaCNN(n_class=class_n_lisa).to(device)
         model.load_state_dict(
-            # torch.load(f'ShadowAttack/model/{"adv_" if target_model == "robust" else ""}model_lisa.pth',
-            torch.load(f'ShadowAttack/model/{"adv_" if target_model == "robust" else ""}model_lisa.pth',
+            # torch.load(f'{MODEL_PATH}/{"adv_" if target_model == "robust" else ""}model_lisa.pth',
+            torch.load(f'{MODEL_PATH}/{"adv_" if target_model == "robust" else ""}model_lisa.pth',
                        map_location=torch.device(device)))
         pre_process = transforms.Compose([transforms.ToTensor()])
     else:
         model = gtsrb.GtsrbCNN(n_class=class_n_gtsrb).to(device)
         model.load_state_dict(
-            # torch.load(f'ShadowAttack/model/{"adv_" if target_model == "robust" else ""}model_gtsrb.pth',
-            torch.load(f'ShadowAttack/model/{"adv_" if target_model == "robust" else ""}model_gtsrb.pth',
+            # torch.load(f'{MODEL_PATH}/{"adv_" if target_model == "robust" else ""}model_gtsrb.pth',
+            torch.load(f'{MODEL_PATH}/{"adv_" if target_model == "robust" else ""}model_gtsrb.pth',
                        map_location=torch.device(device)))
         pre_process = transforms.Compose([
             pre_process_image, transforms.ToTensor()])

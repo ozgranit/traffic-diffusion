@@ -1,2 +1,0 @@
-Correct: False
-Predict: 7 Confidence: 60.57431697845459%Attack succeed! Try to implement it in the real world.

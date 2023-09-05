@@ -1,0 +1,15 @@
+/usr/bin/python3 /tmp/pycharm_project_250/explore_results.py 
+total inputs (different orig images_orig):  25
+total_generated_imgs:  6
+total_test_image_variations:  150
+total_adv_gen_attack_succeeded_normal:  11
+avg_prob_gen_attack_succeeded_normal:  0.11
+acc_normal:  7.33
+count_greater_than_zero_normal (succeeded):  5
+---------------
+total_adv_gen_attack_succeeded_special:  21
+avg_prob_gen_attack_succeeded_special:  0.13
+acc_special:  14.00
+count_greater_than_zero_special (succeeded):  7
+
+Process finished with exit code 0

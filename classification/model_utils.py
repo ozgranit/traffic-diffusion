@@ -6,8 +6,9 @@ import json
 import torch
 import os
 
-from GtsrbCNN import GtsrbCNN
-from LisaCNN import LisaCNN
+from models.gtsrb_model import GtsrbCNN
+from models.lisa_model import LisaCNN
+
 MODELS_PATH = 'classification/classification_models/'
 LISA_GROUND_TRUTH = 12
 GTSRB_GROUND_TRUTH = 14

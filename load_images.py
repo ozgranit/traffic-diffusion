@@ -9,7 +9,7 @@ import sys
 
 import numpy as np
 
-sys.path.append('ShadowAttack')
+sys.path.append('attacks/ShadowAttack')
 # LISA stop sign label is: 12
 # GTSRB stop sign label is: 14
 
