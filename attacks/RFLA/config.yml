@@ -1,7 +1,7 @@
 sys_flag: "win"
 max_iter: 200
 model_name: "LISA"
-dataset_name: "imagenet"
+dataset_name: "LISA"
 shape_type: "hexagon"
 image_size: 224
 batch_size : 50

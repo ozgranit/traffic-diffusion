@@ -1,10 +1,7 @@
 import argparse
 import random
-import numpy as np
-import torch
-import torchvision
 import yaml
-from torchvision import models, transforms
+from torchvision import transforms
 import time
 import data_loader
 import utils_rfla
@@ -242,7 +239,9 @@ class PSOAttack(object):
             g_fitness = torch.sum(fitness_score).item()
             p_best_idx = torch.argmin(fitness_score)
             g_fitness_real = torch.min(fitness_score)
-
+            #self.pops - 50x30x10
+            #pops - 30x10
+            #p_best 50x10
             self.pops[i, ...] = pops
             self.p_best[i] = pops[p_best_idx.item()]
             self.p_best_fitness[i] = fitness_score[p_best_idx.item()]

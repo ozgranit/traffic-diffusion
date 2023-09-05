@@ -7,8 +7,6 @@ from PIL import Image, ImageOps
 import torch
 from torchvision import models
 
-
-
 def get_model(model_name, device):
     normalize = Normalize(mean=[0.485, 0.456, 0.406],
                           std=[0.229, 0.224, 0.225])
@@ -69,8 +67,6 @@ def pixel_ell0_norm(image1, image2):
     diff = torch.sum(diff, dim=1)
     diff = torch.flatten(diff)
     return diff[diff > 0].shape[0]
-
-
 
 def sort_points_by_distance(points):
     """
