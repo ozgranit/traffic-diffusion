@@ -10,7 +10,7 @@ from img_utils import crop_image
 
 DIFFUSION_IMAGES_PATH = r'larger_images/image_outputs'
 class DiffusionImages:
-    def __init__(self, img_name, img_bbx, size, experiment_dir):
+    def __init__(self, img_name: str, img_bbx: List[int], size: int, experiment_dir: str):
         # Loading generated images
         self.generated_dir_path: str = f'{DIFFUSION_IMAGES_PATH}/{img_name}'  # generated_images/road53'
         self.generated_imgs_train_cropped, self.generated_imgs_train_cropped_names = self.load_generated_augmentations_by_type(

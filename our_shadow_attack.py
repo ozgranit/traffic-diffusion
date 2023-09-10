@@ -1,44 +1,37 @@
 import argparse
-import json
-import os
 import sys
-from typing import List, Union
+from typing import Union, Tuple
 from collections import Counter
 
-import cv2
 import numpy as np
-import pandas as pd
 from matplotlib import pyplot as plt
-from torchvision import transforms
 
-# Third-party library imports
-from attacks.ShadowAttack import gtsrb, lisa
-from attacks.ShadowAttack.our_pso import OurPSO
 from attacks.ShadowAttack.pso import PSO
-from attacks.ShadowAttack.shadow_attack_settings import PARAMS_PATH
-from attacks.ShadowAttack.utils import pre_process_image, draw_shadow, shadow_edge_blur, brightness, judge_mask_type, load_mask
-
-# Local module imports
 from attacks.ShadowAttack.utils import *
+from attacks.ShadowAttack.our_pso import OurPSO
 from buildData.diffusion_generated_imgs import DiffusionImages
 from buildData.input_data import InputData
 from datasets.kaggle.kaggle_images_settings import KAGGLE_IMAGES
-from datasets.larger_images.larger_images_settings import LARGER_IMAGES_INPUTS, LARGER_IMAGES_ANNOTATIONS, \
-    LARGER_IMAGES_MASKS, LARGER_IMAGES
+from datasets.larger_images.larger_images_settings import LARGER_IMAGES
 from general_utils import str2bool
 from inferenceAndResults import inference_on_src_attacked
-from inferenceAndResults.shadow_attack_dataframe_results.results_df_settings import DF_RESULTS_COLUMNS
 from models.gtsrb_model import GtsrbModel
 from models.lisa_model import LisaModel
-from settings import GENERATED_IMAGES_TYPES_TRAIN, GENERATED_IMAGES_TYPES_TEST, ATTACK_TYPE_A, ATTACK_TYPE_B, DEVICE, \
-    LISA, STOP_SIGN_LISA_LABEL, STOP_SIGN_GTSRB_LABEL, GTSRB
-from load_images import process_image, plot_triple_images_and_adv, crop_image
-from plot_images import plot_2_images_in_a_row, create_pair_plots
+from settings import ATTACK_TYPE_A, ATTACK_TYPE_B, LISA, GTSRB, \
+                     STOP_SIGN_LISA_LABEL, STOP_SIGN_GTSRB_LABEL
+from load_images import process_image
+from plot_images import create_pair_plots
 from shadow import Shadow
-from seed import *
 
 sys.path.append('attacks/ShadowAttack')
 from attacks.ShadowAttack.utils import brightness, judge_mask_type, load_mask
+random_seed = 42
+random.seed(random_seed)
+np.random.seed(random_seed)
+torch.manual_seed(random_seed)
+torch.cuda.manual_seed(random_seed)
+torch.backends.cudnn.deterministic = True
+torch.backends.cudnn.benchmark = False  # Set this to False for fully deterministic results
 
 class Attack:
 
@@ -109,7 +102,8 @@ class Attack:
 
         assert self.attack_type in ['digital', 'physical']
 
-    def attack(self, attack_image, label: int, coords, targeted_attack: bool = False,
+    def attack(self, attack_image: np.ndarray, label: int, coords: Tuple[np.ndarray, np.ndarray],
+               targeted_attack: bool = False,
                physical_attack: bool=False, **parameters):
         r"""
         Physical-world adversarial attack by shadow.
@@ -265,8 +259,8 @@ class Attack:
 
         return asr_orig
 
-    def our_attack_physical(self, image, image_name: str,
-                                         mask, true_label: int,
+    def our_attack_physical(self, image: np.ndarray, image_name: str,
+                                         mask: np.ndarray, true_label: int,
                                         transform_num: int = 0,
                                                    diffusion_imgs: DiffusionImages = None) -> bool:
         mask_image = np.expand_dims(mask, axis=-1)
@@ -381,7 +375,7 @@ if __name__ == '__main__':
                         help="Usually 100 for normal attack and 200 for physical attack")
     parser.add_argument("--crop_size", type=int, default=32,
                         help="Image size before feed in to the model")
-    parser.add_argument("--output_dir", type=str, default="'experiments/shadowAttack'", #rf'experiments/{input_data.input_name}',
+    parser.add_argument("--output_dir", type=str, default="experiments/_tmp_/shadowAttack", #rf'experiments/{input_data.input_name}',
                         help="Folder path to dave output")
     parser.add_argument("--our_attack", type=str2bool, default=True,
                         # action="store_true",

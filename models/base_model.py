@@ -48,7 +48,7 @@ class BaseModel(ABC):
 
             return confidence, pred_label, None, msg
 
-    def __predict_img(self, img):
+    def __predict_img(self, img: torch.Tensor):
         predict = torch.softmax(self.model(img)[0], 0)
         pred_label = int(torch.argmax(predict).data)
         confidence = float(predict[pred_label].data)
