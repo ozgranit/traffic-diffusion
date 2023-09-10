@@ -10,7 +10,7 @@ class Results:
         self.total_diffusion_imgs_attacked = 0
         self.total_diffusion_images_model_pred_correctly = 0
         self.model_pred_correctly_on_srcAdv_img = 0
-
+        self.total_diff_imgs_with_at_lease_one_diffusion_image_success = 0
     def get_results(self) -> str:
         # Create the result string
         result = (
@@ -21,8 +21,11 @@ class Results:
                 f"Total_diffusion_imgs_attacked: {self.total_diffusion_imgs_attacked}, Acc: {(self.total_diffusion_imgs_attacked / self.total_diffusion_images) * 100}%\n"
                 f"Total_diffusion_images_model_pred_correctly: {self.total_diffusion_images_model_pred_correctly}, Acc: {(self.total_diffusion_images_model_pred_correctly / self.total_diffusion_images) * 100}%\n"
                 f"model_pred_correctly_on_srcAdv_img: {self.model_pred_correctly_on_srcAdv_img}\n"
-                '#' * 100
+                f"total_diff_imgs_with_at_lease_one_diffusion_image_success: {self.total_diff_imgs_with_at_lease_one_diffusion_image_success}\n"
         )
+
+        result += '#' * 100
+        result += '\n'
 
         return result
 

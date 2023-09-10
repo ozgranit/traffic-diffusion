@@ -1,33 +1,32 @@
 import argparse
 import json
 import os
-from typing import List, Tuple
-from collections import Counter
+from typing import List
 
 import cv2
+from collections import Counter
+import sys
 import pandas as pd
 from torchvision import transforms
 
-# Third-party library imports
+from attacks.ShadowAttack.shadow_attack_settings import MODEL_PATH
+from attacks.ShadowAttack.utils import pre_process_image, draw_shadow, shadow_edge_blur
+
 from attacks.ShadowAttack import gtsrb, lisa
 from attacks.ShadowAttack.pso import PSO
-from attacks.ShadowAttack.utils import draw_shadow, shadow_edge_blur, brightness, \
-    judge_mask_type, pre_process_image
-
-# Local module imports
-from buildData.diffusion_generated_imgs import DiffusionImages
-from datasets.larger_images.larger_images_settings import LARGER_IMAGES_INPUTS, LARGER_IMAGES_ANNOTATIONS, LARGER_IMAGES_MASKS
+from datasets.larger_images.larger_images_settings import LARGER_IMAGES_INPUTS, LARGER_IMAGES_ANNOTATIONS, \
+    LARGER_IMAGES_MASKS
+from inferenceAndResults.shadow_attack_dataframe_results.explore_results import explore_total_physical_attack_results
+from inferenceAndResults import inference_on_src_attacked
 from inferenceAndResults.shadow_attack_dataframe_results.results_df_settings import DF_RESULTS_COLUMNS
-from models.base_model import BaseModel
-from models.model_utils import load_model_wrapper
-from settings import GENERATED_IMAGES_TYPES_TRAIN, GENERATED_IMAGES_TYPES_TEST, ATTACK_TYPE_A, ATTACK_TYPE_B, DEVICE
+from settings import GENERATED_IMAGES_TYPES_TRAIN, GENERATED_IMAGES_TYPES_TEST, ATTACK_TYPE_A, ATTACK_TYPE_B
 from load_images import process_image, plot_triple_images_and_adv, crop_image
 from plot_images import plot_2_images_in_a_row
 from shadow import Shadow
+
+sys.path.append('../attacks/ShadowAttack')
+from attacks.ShadowAttack.utils import brightness, judge_mask_type, load_mask
 from seed import *
-
-
-# sys.path.append(SHADOW_ATTACK_DIR)
 # LISA stop sign label is: 12
 # GTSRB stop sign label is: 14
 
@@ -62,13 +61,13 @@ mask_path = args.mask_path
 polygon = args.polygon
 n_try = args.n_try
 
-# # def load_params():
-# with open('attacks/ShadowAttack/params.json', 'rb') as f:
-#     params = json.load(f)
-#     class_n_gtsrb = params['GTSRB']['class_n']
-#     class_n_lisa = params['LISA']['class_n']
-#     device = params['device']
-#     position_list, mask_list = load_mask()
+# def load_params():
+with open('../attacks/ShadowAttack/params.json', 'rb') as f:
+    params = json.load(f)
+    class_n_gtsrb = params['GTSRB']['class_n']
+    class_n_lisa = params['LISA']['class_n']
+    device = params['device']
+    position_list, mask_list = load_mask()
 
         # return position_list, mask_list
 
@@ -85,26 +84,26 @@ else:
     max_speed = 10.
     n_try = 1
 
-# # def load_model(attack_db, class_n_lisa, class_n_gtsrb, device):
-# assert attack_db in ['LISA', 'GTSRB']
-# if attack_db == "LISA":
-#     model = lisa.LisaCNN(n_class=class_n_lisa).to(device)
-#     model.load_state_dict(
-#         # torch.load(f'{MODEL_PATH}/{"adv_" if target_model == "robust" else ""}model_lisa.pth',
-#         torch.load(f'{MODEL_PATH}/{"adv_" if target_model == "robust" else ""}model_lisa.pth',
-#                    map_location=torch.device(device)))
-#     pre_process = transforms.Compose([transforms.ToTensor()])
-# else:
-#     model = gtsrb.GtsrbCNN(n_class=class_n_gtsrb).to(device)
-#     model.load_state_dict(
-#         # torch.load(f'{MODEL_PATH}/{"adv_" if target_model == "robust" else ""}model_gtsrb.pth',
-#         torch.load(f'{MODEL_PATH}/{"adv_" if target_model == "robust" else ""}model_gtsrb.pth',
-#                    map_location=torch.device(device)))
-#     pre_process = transforms.Compose([
-#         pre_process_image, transforms.ToTensor()])
-# model.eval()
+# def load_model(attack_db, class_n_lisa, class_n_gtsrb, device):
+assert attack_db in ['LISA', 'GTSRB']
+if attack_db == "LISA":
+    model = lisa.LisaCNN(n_class=class_n_lisa).to(device)
+    model.load_state_dict(
+        # torch.load(f'{MODEL_PATH}/{"adv_" if target_model == "robust" else ""}model_lisa.pth',
+        torch.load(f'{MODEL_PATH}/{"adv_" if target_model == "robust" else ""}model_lisa.pth',
+                   map_location=torch.device(device)))
+    pre_process = transforms.Compose([transforms.ToTensor()])
+else:
+    model = gtsrb.GtsrbCNN(n_class=class_n_gtsrb).to(device)
+    model.load_state_dict(
+        # torch.load(f'{MODEL_PATH}/{"adv_" if target_model == "robust" else ""}model_gtsrb.pth',
+        torch.load(f'{MODEL_PATH}/{"adv_" if target_model == "robust" else ""}model_gtsrb.pth',
+                   map_location=torch.device(device)))
+    pre_process = transforms.Compose([
+        pre_process_image, transforms.ToTensor()])
+model.eval()
 
-def attack(model_wrapper: BaseModel, with_EOT: bool, attack_image, label, coords, targeted_attack=False, physical_attack=False, generated_images=None, **parameters):
+def attack(with_EOT, attack_image, label, coords, targeted_attack=False, physical_attack=False, generated_images=None, **parameters):
     """
     Physical-world adversarial attack by shadow.
 
@@ -134,8 +133,8 @@ def attack(model_wrapper: BaseModel, with_EOT: bool, attack_image, label, coords
         print(f"try {attempt + 1}:", end=" ")
 
         pso = PSO(with_EOT, polygon * 2, particle_size, iter_num, x_min, x_max, max_speed, shadow_level, attack_image,
-                  coords, model_wrapper.model, targeted_attack, physical_attack, label, model_wrapper.pre_process_image,
-                  generated_images=generated_images, **parameters)
+                  coords, model, targeted_attack, physical_attack, label, generated_images=generated_images,
+                  **parameters)
 
         best_solution, best_pos, succeed, query = pso.update_digital() \
             if not physical_attack else pso.update_physical()
@@ -155,11 +154,10 @@ def attack(model_wrapper: BaseModel, with_EOT: bool, attack_image, label, coords
 
     return adv_image, succeed, num_query, Shadow(global_best_position, coords, shadow_level, coefficient)
 
-def attack_digital(attack_db: str = "LISA", adv_model: bool = False, crop_size = (32, 32)):
+def attack_digital(attack_db: str = "LISA"):
     shadow_level = 0.5  # Replace with the desired shadow level
     # position_list, mask_list = load_params()
     save_dir = f'./adv_img/{attack_db}/{int(shadow_level * 100)}'
-    model_wrapper = load_model_wrapper(attack_db, crop_size)
     try:
         os.makedirs(save_dir, exist_ok=True)
     except FileExistsError:
@@ -177,8 +175,8 @@ def attack_digital(attack_db: str = "LISA", adv_model: bool = False, crop_size =
     print(f"Start attacking {len(cropped_resized_imgs)} images")
     for index in range(len(cropped_resized_imgs)):
         mask_type = judge_mask_type(attack_db, labels[index])
-        if brightness(cropped_resized_imgs[index], model_wrapper.mask_list[mask_type]) >= 120:
-            adv_img, success, num_query, shadow_params = attack(model_wrapper, False,
+        if brightness(cropped_resized_imgs[index], mask_list[mask_type]) >= 120:
+            adv_img, success, num_query, shadow_params = attack(False,
                 cropped_resized_imgs[index], labels[index], position_list[mask_type])
 
             cv2.imwrite(f"{save_dir_bmp}/{file_names[index]}_{labels[index]}_{num_query}_{success}.bmp", adv_img)
@@ -195,7 +193,7 @@ def attack_digital(attack_db: str = "LISA", adv_model: bool = False, crop_size =
     print(Counter(map(lambda x: x[:-4].split('_')[-1],
                       os.listdir(save_dir)))['True'] / len(os.listdir(save_dir)))
 
-def load_generated_augmentations(dir_path: str, bbx: List[float], to_size: int = 32):
+def load_generated_augmentations(dir_path, bbx, to_size=32):
     generated_imgs = []
     for img_name in os.listdir(dir_path):
         if img_name.lower().endswith(('jpg','png')):
@@ -209,7 +207,7 @@ def load_generated_augmentations(dir_path: str, bbx: List[float], to_size: int =
 
     return generated_imgs
 
-def load_generated_augmentations_by_type(types: str, dir_path: str, bbx: List[int], to_size: int = 32):
+def load_generated_augmentations_by_type(types: str, dir_path: str, bbx: List[int], to_size: int =32):
     generated_imgs = []
     generated_imgs_names = []
     for img_name in sorted(os.listdir(dir_path)):
@@ -310,14 +308,13 @@ def load_generated_augmentations_by_type(types: str, dir_path: str, bbx: List[in
 #         f.write(summary_msg)
 #     print("output dir: ", output_dir)
 
-def predict_image(model: torch.nn.Module, image: np.ndarray, description: str = "", print_results: bool = True,
-                  attack_db: str = 'LISA'):
+def predict_image(image, description="", print_results=True, attack_db='LISA'):
     with torch.no_grad():
         img_ = cv2.resize(image, (32, 32))
         if attack_db == 'GTSRB':
             img_ = pre_process_image(img_).astype(np.float32)
         img_ = transforms.ToTensor()(img_)
-        img_ = img_.unsqueeze(0).to(DEVICE)
+        img_ = img_.unsqueeze(0).to(device)
         predict_ = torch.softmax(model(img_), 1)
         if print_results:
             print('-'*15)
@@ -327,32 +324,28 @@ def predict_image(model: torch.nn.Module, image: np.ndarray, description: str = 
 
         return predict_.max(1)
 
-def calculate_average_prob(lst: List[Tuple[str, int, float]], true_label: int, desired_wrong_label: int = None):
+def calculate_average_prob(lst, true_label, desired_wrong_label=None):
     total_desired_wrong_predictions = 0
     total_prob_sum = 0 # of desired wrong pred
-    total_true_label = 0
+    cnt_true_label = 0
 
     for type_name, pred_label, pred_prob in lst:
         if pred_label == true_label:  # meaning attack failed
-            total_true_label += 1
+            cnt_true_label += 1
         # elif desired_wrong_label is not None and pred_label == desired_wrong_label:
         #     total_desired_wrong_predictions += 1
         #     total_prob_sum += pred_prob
         else:
             total_desired_wrong_predictions += 1
             total_prob_sum += pred_prob
-
-
-
-
     if total_desired_wrong_predictions > 0:
         average_prob = total_prob_sum / total_desired_wrong_predictions
     else:
         average_prob = 0
 
-    return total_desired_wrong_predictions, average_prob, total_true_label
+    return total_desired_wrong_predictions, average_prob, cnt_true_label
 
-def attack_physical(attack_db: str):
+def attack_physical(attack_db):
     global position_list
     P_PROB = 0
     P_LABEL = 1
@@ -365,9 +358,8 @@ def attack_physical(attack_db: str):
     cnt_attacked = 0
     df_results = pd.DataFrame(columns=DF_RESULTS_COLUMNS)
     # mask_path = r'ShadowAttack/tmp/gtsrb_30_mask.png'
-    mask_path = r'octagon_mask.png'
+    mask_path = r'../octagon_mask.png'
     size=224
-    model_wrapper = load_model_wrapper(attack_db, crop_size=(32, 32))
     transform_num_for_normal_attack = 0#14#43
     transform_num_for_special_attack =0#2#43
     with_EOT = True
@@ -377,6 +369,8 @@ def attack_physical(attack_db: str):
     pos_list = np.where(mask_image.sum(axis=2) > 0)
     # img_name = "road_1"
     # ind = file_names.index(img_name)
+    total_true_label_normal, total_true_label_special = 0, 0
+
     for ind in range(len(file_names)):
         true_label = labels[ind]
         img_name = file_names[ind]
@@ -403,11 +397,11 @@ def attack_physical(attack_db: str):
         generated_images_for_normal_attack = None #generated_imgs_cropped
         generated_images_for_special_attack = generated_imgs_train_cropped #generated_imgs_cropped
         # EOT is included in the first stage
-        adv_img_normal, _, _, shadow_params_normal = attack(model_wrapper, with_EOT, target_image, image_label, pos_list,
+        adv_img_normal, _, _, shadow_params_normal = attack(with_EOT, target_image, image_label, pos_list,
                                                             physical_attack=True, transform_num=transform_num_for_normal_attack,
                                                             generated_images=generated_images_for_normal_attack)#generated_imgs_cropped
 
-        adv_img_special, _, _, shadow_params_special = attack(model_wrapper, with_EOT, target_image, image_label, pos_list,
+        adv_img_special, _, _, shadow_params_special = attack(with_EOT, target_image, image_label, pos_list,
                                                               physical_attack=True, transform_num=transform_num_for_special_attack,
                                                               generated_images=generated_images_for_special_attack)
 
@@ -428,16 +422,15 @@ def attack_physical(attack_db: str):
         #
         #---------------------------------------------------
         with torch.no_grad():
-            clean_image_predict = predict_image(model_wrapper.model, target_image, "clean image", print_results=False, attack_db=attack_db)
-            adv_img_normal_predict = predict_image(model_wrapper.model, adv_img_normal, "adv image normal", print_results=False, attack_db=attack_db)
-            adv_img_special_predict = predict_image(model_wrapper.model, adv_img_special, "adv image special", print_results=False, attack_db=attack_db)
+            clean_image_predict = predict_image(target_image, "clean image", print_results=False, attack_db=attack_db)
+            adv_img_normal_predict = predict_image(adv_img_normal, "adv image normal", print_results=False, attack_db=attack_db)
+            adv_img_special_predict = predict_image(adv_img_special, "adv image special", print_results=False, attack_db=attack_db)
             df_result_row = [file_names[ind], labels[ind], clean_image_predict[1].item(), clean_image_predict[0].item(),
                              adv_img_normal_predict[1].item(), adv_img_normal_predict[0].item(),
                              adv_img_special_predict[1].item(), adv_img_special_predict[0].item()]
 
             test_gen_normal_preds, test_gen_special_preds = [], []
         # Apply shadow to test image
-
         for gen_type in GENERATED_IMAGES_TYPES_TEST:
             gen_ind = GENERATED_IMAGES_TYPES_TEST.index(gen_type)
             gen_test_image = generated_imgs_test_cropped[gen_ind]
@@ -464,11 +457,14 @@ def attack_physical(attack_db: str):
         with open(os.path.join(output_dir_special, 'gen_results.json'), 'w') as json_file:
             json.dump(test_gen_special_preds, json_file)
 
-        total_desired_wrong_predictions_normal, average_prob_normal, total_true_label_normal = calculate_average_prob(test_gen_normal_preds, true_label, adv_img_normal_predict[1].item())
-        total_desired_wrong_predictions_special, average_prob_special, total_true_label_special = calculate_average_prob(test_gen_special_preds, true_label, adv_img_special_predict[1].item())
+        total_desired_wrong_predictions_normal, average_prob_normal, current_true_label_normal = calculate_average_prob(test_gen_normal_preds, true_label, adv_img_normal_predict[1].item())
+        total_true_label_normal += current_true_label_normal
+        total_desired_wrong_predictions_special, average_prob_special, current_true_label_special = calculate_average_prob(test_gen_special_preds, true_label, adv_img_special_predict[1].item())
+        total_true_label_special += current_true_label_special
+
         df_result_row += [len(GENERATED_IMAGES_TYPES_TEST)]
-        df_result_row += [total_desired_wrong_predictions_normal, average_prob_normal, total_true_label_normal]
-        df_result_row += [total_desired_wrong_predictions_special, average_prob_special, total_true_label_special]
+        df_result_row += [total_desired_wrong_predictions_normal, average_prob_normal, current_true_label_normal]
+        df_result_row += [total_desired_wrong_predictions_special, average_prob_special, current_true_label_special]
 
         pd.DataFrame([df_result_row], columns=DF_RESULTS_COLUMNS).to_csv(os.path.join(output_dir, f'{file_names[ind]}.csv'), index=False)
         df_results.loc[ind] = df_result_row
@@ -478,8 +474,8 @@ def attack_physical(attack_db: str):
         msg_normal, summary_msg_normal = check_and_save_final_attacked_image(adv_img_normal, attack_db, image_label, output_dir_normal)
         msg_special, summary_msg_special = check_and_save_final_attacked_image(adv_img_special, attack_db, image_label, output_dir_special)
 
-        # cv2.waitKey(0)
-        with open(f'./{output_dir}/results.txt', 'w') as f:
+        output_report_path = f"./{output_dir}/info.txt"
+        with open(output_report_path, 'w') as f:
             f.write("normal attack:")
             f.write(msg_normal)
             f.write('\n')
@@ -489,38 +485,54 @@ def attack_physical(attack_db: str):
             f.write(msg_special)
             f.write('\n')
             f.write(summary_msg_special)
+
+            f.write(f"with_EOT: , {with_EOT}\n")
+            f.write(f"transform_num_for_normal_attack: {transform_num_for_normal_attack}\n")
+            f.write(f"transform_num_for_special_attack: {transform_num_for_special_attack}\n")
+            f.write(f"iter_num: {iter_num}\n")
+            f.write(f"attack_db: {attack_db}\n")
+            f.write(
+                f"total_true_label_normal on diffusion imgs: {total_true_label_normal}, acc: {str(total_true_label_normal / len(file_names) * len(generated_imgs_test_cropped_names))}\n")
+            f.write(
+                f"total_true_label_special on diffusion imgs: {total_true_label_special}, acc: {str(total_true_label_special / len(file_names) * len(generated_imgs_test_cropped_names))}\n")
+
         print("output dir: ", output_dir)
+
+    print("total_true_label_normal on diffusion imgs: ", total_true_label_normal,
+          "acc: ", str(total_true_label_normal / len(test_gen_normal_preds)))
+
+    print("total_true_label_special on diffusion imgs: ", total_true_label_special,
+          "acc: ", str(total_true_label_special / len(test_gen_special_preds)))
+
 
         # if ind==2:
         #     break
+    explore_total_physical_attack_results(output_report_path)
+    inference_on_src_attacked.main(attack_db, output_dir, attack_methods=[ATTACK_TYPE_A, ATTACK_TYPE_B])
 
-def attack_physical_untargeted_only(attack_db: str):
+def attack_physical_untargeted_only(attack_db):
     global position_list
     print("attack_db: ", attack_db)
     P_PROB = 0
     P_LABEL = 1
-    transform_num_for_normal_attack = 0#14#43
-    transform_num_for_special_attack =0#2#43
-    size = 224
-    with_EOT = False
+    file_names, orig_imgs, cropped_imgs, cropped_resized_imgs, labels, bbx, masks_cropped = process_image(LARGER_IMAGES_INPUTS, #TODO: remove comment and add notes that kaggle can be loaded, #kaggle_images',
+                                                                                           LARGER_IMAGES_ANNOTATIONS,
+                                                                                           attack_db, crop_size=224, mask_folder=LARGER_IMAGES_MASKS)
+
+    with_EOT = True #False
+    experiment_dir = f'larger_images/experiments/physical_attack_untargeted_mask_equal_split_{attack_db}_EOT-{with_EOT}_iter-{iter_num}_level-{args.shadow_level}_tmp'
     image_label = 12 if attack_db=="LISA" else 14
-    adv_model = False
-    file_names, orig_imgs, cropped_imgs, cropped_resized_imgs, labels, bbx, masks_cropped = process_image(
-        LARGER_IMAGES_INPUTS,  # TODO: remove comment and add notes that kaggle can be loaded, #kaggle_images',
-        LARGER_IMAGES_ANNOTATIONS,
-        attack_db, crop_size=size, mask_folder=LARGER_IMAGES_MASKS)
-
-    experiment_dir = f'larger_images/physical_attack_untar_mask_equal_split_{attack_db}_EOT-{with_EOT}_iter-{iter_num}_tmp'
     cnt_attacked = 0
-    model_wrapper = load_model_wrapper(attack_db, adv_model, size)
-
     df_results = pd.DataFrame(columns=DF_RESULTS_COLUMNS)
-    # mask_path = r'ShadowAttack/tmp/gtsrb_30_mask.png'
-    mask_path = r'octagon_mask.png'
+    mask_path = r'../octagon_mask.png'
+    size=224
+    transform_num_for_normal_attack = 14    #0 #14#43
+    transform_num_for_special_attack =2 #0 #2#43
     # mask_image = cv2.resize(
     #     cv2.imread(mask_path, cv2.IMREAD_UNCHANGED), (size, size))
     # img_name = "road_1"
     # ind = file_names.index(img_name)
+    total_true_label_normal, total_true_label_special = 0, 0
     for ind in range(len(file_names)):
         mask_image = np.expand_dims(masks_cropped[ind], axis=-1)
         pos_list = np.where(mask_image.sum(axis=2) > 0)
@@ -535,16 +547,27 @@ def attack_physical_untargeted_only(attack_db: str):
         #     cv2.imread(image_path), (224, 224))
 
         # Loading generated images
-        output_dir=f'{experiment_dir}/{img_name}'
-        diffusion_imgs = DiffusionImages(img_name, bbx[ind], size, experiment_dir)
-        # EOT is included in the first stage
-        adv_img_normal, _, _, shadow_params_normal = attack(model_wrapper, with_EOT, target_image, image_label, pos_list,
-                                                            physical_attack=True, transform_num=transform_num_for_normal_attack,
-                                                            generated_images=diffusion_imgs.generated_images_for_normal_attack)#generated_imgs_cropped
+        generated_dir_path = f'larger_images/image_outputs/{img_name}'   #generated_images/road53'
+        generated_imgs_train_cropped, generated_imgs_train_cropped_names = load_generated_augmentations_by_type(GENERATED_IMAGES_TYPES_TRAIN, generated_dir_path, bbx[ind], to_size=size)
+        generated_imgs_test_cropped, generated_imgs_test_cropped_names = load_generated_augmentations_by_type(GENERATED_IMAGES_TYPES_TEST, generated_dir_path, bbx[ind], to_size=size)
 
-        adv_img_special, _, _, shadow_params_special = attack(model_wrapper, with_EOT, target_image, image_label, pos_list,
+        # Setting output_dir folders
+        output_dir=f'{experiment_dir}/{img_name}'
+        output_dir_normal = os.path.join(output_dir, ATTACK_TYPE_A)
+        output_dir_special = os.path.join(output_dir, ATTACK_TYPE_B) #with diffusion
+        os.makedirs(output_dir_normal, exist_ok=True)
+        os.makedirs(output_dir_special, exist_ok=True)
+
+        generated_images_for_normal_attack = None #generated_imgs_cropped
+        generated_images_for_special_attack = generated_imgs_train_cropped #generated_imgs_cropped
+        # EOT is included in the first stage
+        adv_img_normal, _, _, shadow_params_normal = attack(with_EOT, target_image, image_label, pos_list,
+                                                            physical_attack=True, transform_num=transform_num_for_normal_attack,
+                                                            generated_images=generated_images_for_normal_attack)#generated_imgs_cropped
+
+        adv_img_special, _, _, shadow_params_special = attack(with_EOT, target_image, image_label, pos_list,
                                                               physical_attack=True, transform_num=transform_num_for_special_attack,
-                                                              generated_images=diffusion_imgs.generated_images_for_special_attack)
+                                                              generated_images=generated_images_for_special_attack)
 
         # predict_normal = save_temporarily_attack(adv_img_normal, attack_db, image_label, output_dir_normal)
         # predict_special = save_temporarily_attack(adv_img_special, attack_db, image_label, output_dir_special)
@@ -562,9 +585,9 @@ def attack_physical_untargeted_only(attack_db: str):
         # plot_2_images_in_a_row(cv2.cvtColor(adv_img_normal, cv2.COLOR_BGR2RGB), cv2.cvtColor(adv_img_special, cv2.COLOR_BGR2RGB), "adv_img_normal", "adv_img_special", save_path=os.path.join(output_dir, 'adv_orig_cmp.png'), plot=False)
         #---------------------------------------------------
         with torch.no_grad():
-            clean_image_predict = predict_image(model_wrapper.model, target_image, "clean image", print_results=False, attack_db=attack_db)
-            adv_img_normal_predict = predict_image(model_wrapper.model, adv_img_normal, "adv image normal", print_results=False, attack_db=attack_db)
-            adv_img_special_predict = predict_image(model_wrapper.model, adv_img_special, "adv image special", print_results=False, attack_db=attack_db)
+            clean_image_predict = predict_image(target_image, "clean image", print_results=False, attack_db=attack_db)
+            adv_img_normal_predict = predict_image(adv_img_normal, "adv image normal", print_results=False, attack_db=attack_db)
+            adv_img_special_predict = predict_image(adv_img_special, "adv image special", print_results=False, attack_db=attack_db)
             df_result_row = [file_names[ind], labels[ind], clean_image_predict[1].item(), clean_image_predict[0].item(),
                              adv_img_normal_predict[1].item(), adv_img_normal_predict[0].item(),
                              adv_img_special_predict[1].item(), adv_img_special_predict[0].item()]
@@ -572,52 +595,55 @@ def attack_physical_untargeted_only(attack_db: str):
             test_gen_normal_preds, test_gen_special_preds = [], []
         # Apply shadow to test image
 
-
         for gen_type in GENERATED_IMAGES_TYPES_TEST:
-            gen_ind = diffusion_imgs.generated_imgs_test_cropped_names.index(gen_type)
+            gen_ind = generated_imgs_test_cropped_names.index(gen_type)
             for i in range(1,3):
                 # gen_ind = GENERATED_IMAGES_TYPES_TEST.index(gen_type)
-                gen_test_image = diffusion_imgs.generated_imgs_test_cropped[gen_ind]
-                test_image_clean_predict = predict_image(model_wrapper.model, gen_test_image, "test_image_clean_predict", attack_db=attack_db)
+                gen_test_image = generated_imgs_test_cropped[gen_ind]
+                test_image_clean_predict = predict_image(gen_test_image, "test_image_clean_predict", attack_db=attack_db)
 
                 test_image_shadow_normal = add_shadow_attack_to_image(shadow_params_normal, gen_test_image)
-                test_image_shadow_normal_predict = predict_image(model_wrapper.model, test_image_shadow_normal, "test_image_shadow_normal", attack_db=attack_db)
-                test_gen_normal_preds.append([diffusion_imgs.generated_imgs_test_cropped_names[gen_ind], test_image_shadow_normal_predict[1].item(), test_image_shadow_normal_predict[0].item()])
-                cv2.imwrite(f'./{diffusion_imgs.output_dir_normal}/{diffusion_imgs.generated_imgs_test_cropped_names[gen_ind]}_adv_normal.png', test_image_shadow_normal)
+                test_image_shadow_normal_predict = predict_image(test_image_shadow_normal, "test_image_shadow_normal", attack_db=attack_db)
+                test_gen_normal_preds.append([generated_imgs_test_cropped_names[gen_ind], test_image_shadow_normal_predict[1].item(), test_image_shadow_normal_predict[0].item()])
+                cv2.imwrite(f'./{output_dir_normal}/{generated_imgs_test_cropped_names[gen_ind]}_adv_normal.png', test_image_shadow_normal)
 
                 test_image_shadow_special = add_shadow_attack_to_image(shadow_params_special, gen_test_image)
-                test_image_shadow_special_predict = predict_image(model_wrapper.model, test_image_shadow_special, "test_image_shadow_special", print_results=False, attack_db=attack_db)
-                test_gen_special_preds.append([diffusion_imgs.generated_imgs_test_cropped_names[gen_ind], test_image_shadow_special_predict[1].item(), test_image_shadow_special_predict[0].item()])
-                cv2.imwrite(f'./{diffusion_imgs.output_dir_special}/{diffusion_imgs.generated_imgs_test_cropped_names[gen_ind]}_adv_special.png', test_image_shadow_special)
+                test_image_shadow_special_predict = predict_image(test_image_shadow_special, "test_image_shadow_special", print_results=False, attack_db=attack_db)
+                test_gen_special_preds.append([generated_imgs_test_cropped_names[gen_ind], test_image_shadow_special_predict[1].item(), test_image_shadow_special_predict[0].item()])
+                cv2.imwrite(f'./{output_dir_special}/{generated_imgs_test_cropped_names[gen_ind]}_adv_special.png', test_image_shadow_special)
 
                 df_result_row += [test_image_clean_predict[1].item(), test_image_clean_predict[0].item(),
                                   test_image_shadow_normal_predict[1].item(), test_image_shadow_normal_predict[0].item(),
                                   test_image_shadow_special_predict[1].item(), test_image_shadow_special_predict[0].item()]
-                plot_2_images_in_a_row(cv2.cvtColor(test_image_shadow_normal, cv2.COLOR_BGR2RGB), cv2.cvtColor(test_image_shadow_special, cv2.COLOR_BGR2RGB), "test_image_shadow_normal", "test_image_shadow_special", save_path=os.path.join(output_dir, f'{diffusion_imgs.generated_imgs_test_cropped_names[gen_ind]}_adv_cmp.png'), plot=False)
+                plot_2_images_in_a_row(cv2.cvtColor(test_image_shadow_normal, cv2.COLOR_BGR2RGB), cv2.cvtColor(test_image_shadow_special, cv2.COLOR_BGR2RGB), "test_image_shadow_normal", "test_image_shadow_special", save_path=os.path.join(output_dir, f'{generated_imgs_test_cropped_names[gen_ind]}_adv_cmp.png'), plot=False)
                 gen_ind+=1
 
         # Calculate total summary for each attack row on generated images:
-        with open(os.path.join(diffusion_imgs.output_dir_normal, 'gen_results.json'), 'w') as json_file:
+        with open(os.path.join(output_dir_normal, 'gen_results.json'), 'w') as json_file:
             json.dump(test_gen_normal_preds, json_file)
-        with open(os.path.join(diffusion_imgs.output_dir_special, 'gen_results.json'), 'w') as json_file:
+        with open(os.path.join(output_dir_special, 'gen_results.json'), 'w') as json_file:
             json.dump(test_gen_special_preds, json_file)
 
-        total_desired_wrong_predictions_normal, average_prob_normal, total_true_label_normal = calculate_average_prob(test_gen_normal_preds, true_label, adv_img_normal_predict[1].item())
-        total_desired_wrong_predictions_special, average_prob_special, total_true_label_special = calculate_average_prob(test_gen_special_preds, true_label, adv_img_special_predict[1].item())
+        total_desired_wrong_predictions_normal, average_prob_normal, current_true_label_normal = calculate_average_prob(test_gen_normal_preds, true_label, adv_img_normal_predict[1].item())
+        total_true_label_normal += current_true_label_normal
+        total_desired_wrong_predictions_special, average_prob_special, current_true_label_special = calculate_average_prob(test_gen_special_preds, true_label, adv_img_special_predict[1].item())
+        total_true_label_special += current_true_label_special
         df_result_row += [len(GENERATED_IMAGES_TYPES_TEST)*2]
-        df_result_row += [total_desired_wrong_predictions_normal, average_prob_normal, total_true_label_normal]
-        df_result_row += [total_desired_wrong_predictions_special, average_prob_special, total_true_label_special]
+        df_result_row += [total_desired_wrong_predictions_normal, average_prob_normal, current_true_label_normal]
+        df_result_row += [total_desired_wrong_predictions_special, average_prob_special, current_true_label_special]
 
         pd.DataFrame([df_result_row], columns=DF_RESULTS_COLUMNS).to_csv(os.path.join(output_dir, f'{file_names[ind]}.csv'), index=False)
         df_results.loc[ind] = df_result_row
 
         #---------------------------------------------------
-        df_results.to_csv(os.path.join(experiment_dir, 'results.csv'), index=False)
-        msg_normal, summary_msg_normal = check_and_save_final_attacked_image(adv_img_normal, attack_db, image_label, diffusion_imgs.output_dir_normal)
-        msg_special, summary_msg_special = check_and_save_final_attacked_image(adv_img_special, attack_db, image_label, diffusion_imgs.output_dir_special)
+        output_report_path = f'./{experiment_dir}/results.txt'
+        df_results.to_csv(output_report_path, index=False)
+        msg_normal, summary_msg_normal = check_and_save_final_attacked_image(adv_img_normal, attack_db, image_label, output_dir_normal)
+        msg_special, summary_msg_special = check_and_save_final_attacked_image(adv_img_special, attack_db, image_label, output_dir_special)
 
         # cv2.waitKey(0)
-        with open(f'./{output_dir}/results.txt', 'w') as f:
+        output_info_path = f'./{output_dir}/info.txt'
+        with open(output_info_path, 'w') as f:
             f.write("normal attack:")
             f.write(msg_normal)
             f.write('\n')
@@ -627,14 +653,30 @@ def attack_physical_untargeted_only(attack_db: str):
             f.write(msg_special)
             f.write('\n')
             f.write(summary_msg_special)
+            f.write('*'*15)
+            f.write(f"with_EOT: , {with_EOT}\n")
+            f.write(f"transform_num_for_normal_attack: {transform_num_for_normal_attack}\n")
+            f.write(f"transform_num_for_special_attack: {transform_num_for_special_attack}\n")
+            f.write(f"iter_num: {iter_num}\n")
+            f.write(f"attack_db: {attack_db}\n")
+            f.write(f"total_true_label_normal on diffusion imgs: {total_true_label_normal}, acc: {str(total_true_label_normal/ len(file_names) * len(generated_imgs_test_cropped_names))}\n")
+            f.write(f"total_true_label_special on diffusion imgs: {total_true_label_special}, acc: {str(total_true_label_special/ len(file_names) * len(generated_imgs_test_cropped_names))}\n")
+
         print("output dir: ", output_dir)
+        break
+    print("total_true_label_normal on diffusion imgs: ", total_true_label_normal,
+          "acc: ", str(total_true_label_normal / len(file_names) * len(generated_imgs_test_cropped_names)))
+
+    print("total_true_label_special on diffusion imgs: ", total_true_label_special,
+          "acc: ", str(total_true_label_special / len(file_names) * len(generated_imgs_test_cropped_names)))
+
 
         # if ind==2:
         #     break
-        break
+    explore_total_physical_attack_results(output_report_path)
+    inference_on_src_attacked.main(attack_db, experiment_dir, attack_methods=[ATTACK_TYPE_A, ATTACK_TYPE_B])   # TODO: remove this comment atfer fixing atatck to attack['normal_atatck', 'special_atatck']
 
-'attack_physical' or 'attack_physical_untargeted_only'
-def check_and_save_final_attacked_image(adv_img, attack_db: str, image_label: int, output_dir: str):
+def check_and_save_final_attacked_image(adv_img, attack_db, image_label, output_dir):
     cv2.imwrite(f'./{output_dir}/adv_img.png', adv_img)
     if attack_db == 'LISA':
         predict, failed, msg = lisa.test_single_image(
@@ -649,7 +691,7 @@ def check_and_save_final_attacked_image(adv_img, attack_db: str, image_label: in
         print(summary_msg)
     return msg, summary_msg
 
-def add_shadow_attack_to_image(shadow_params_normal: Shadow, test_image):
+def add_shadow_attack_to_image(shadow_params_normal, test_image):
     test_image_shadow, shadow_area = draw_shadow(
         shadow_params_normal.global_best_position, test_image, shadow_params_normal.coords,
         shadow_params_normal.shadow_level)
@@ -658,7 +700,7 @@ def add_shadow_attack_to_image(shadow_params_normal: Shadow, test_image):
     return test_image_shadow
 
 
-def save_temporarily_attack(adv_img, attack_db: str, image_label: int, output_dir: str):
+def save_temporarily_attack(adv_img, attack_db, image_label, output_dir):
     cv2.imwrite(f'./{output_dir}/temp.bmp', adv_img)
     if attack_db == 'LISA':
         predict, failed, msg = lisa.test_single_image(

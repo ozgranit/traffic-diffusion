@@ -291,6 +291,10 @@ def image_transformation(image, position, pos_list, motion_degree, motion_angle,
         res_images[i] = cv2.resize(res_images[i], (32, 32))
         res_images[i] = pre_process(res_images[i])
 
+    if len(res_images) == 1:
+        return res_images[0]
+    if len(res_images[0].shape) > 3 and res_images[0].shape[0] == 1:
+        res_images = [img.squeeze(0) for img in res_images]
     return torch.stack(res_images, dim=0)
 
 

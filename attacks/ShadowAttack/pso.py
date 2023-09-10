@@ -180,7 +180,7 @@ class PSO:
             confidence = float(1 - predict[target])
             success = torch.argmax(predict) == target
         else:
-            confidence = float(predict[self.label])
+            confidence = float(predict[self.label].item())
             success = torch.argmax(predict) != self.label
 
         self.num_query += img.shape[0]
