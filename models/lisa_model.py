@@ -1,4 +1,4 @@
-from typing import Union
+from typing import Union, Tuple
 import cv2
 import torch
 import torch.nn as nn
@@ -29,7 +29,7 @@ class LisaCNN(nn.Module):
         return x
 
 class LisaModel(BaseModel):
-    def __init__(self, adv_model: bool=False, crop_size: tuple[int, int] = (32, 32)):
+    def __init__(self, adv_model: bool=False, crop_size: Tuple[int, int] = (32, 32)):
         self.model_name = LISA
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'  # params['device']
         self.crop_size = crop_size
@@ -46,7 +46,7 @@ class LisaModel(BaseModel):
         return model
 
     @staticmethod
-    def pre_process_image(img: np.ndarray, crop_size: tuple[int, int] = (32, 32), device: str = 'cpu') -> torch.tensor:
+    def pre_process_image(img: np.ndarray, crop_size: Tuple[int, int] = (32, 32), device: str = 'cpu') -> torch.tensor:
         img = cv2.resize(img, crop_size)
         img = transforms.ToTensor()(img)
         img = img.unsqueeze(0).to(device)

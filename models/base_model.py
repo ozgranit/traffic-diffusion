@@ -1,6 +1,6 @@
 import json
 import os
-from typing import Union
+from typing import Union, Tuple
 
 import cv2
 import numpy as np
@@ -65,6 +65,6 @@ class BaseModel(ABC):
         return img
 
     @abstractmethod
-    def pre_process_image(self, img: np.ndarray, crop_size: tuple[int, int] = (32, 32), device: str = 'cpu') -> torch.tensor:
+    def pre_process_image(self, img: np.ndarray, crop_size: Tuple[int, int] = (32, 32), device: str = 'cpu') -> torch.tensor:
         # Implement pre_process_image
         pass
