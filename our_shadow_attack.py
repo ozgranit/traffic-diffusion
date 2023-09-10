@@ -422,7 +422,7 @@ if __name__ == '__main__':
             print(f"ASR orig with diffusion is: {asr_orig_with_diffusion}")
 
             inference_on_src_attacked.main(attack.model_wrapper[0].model_name, experiment_folder=attack.physical_experiment_dir,
-                                           attack_methods=[ATTACK_TYPE_A, ATTACK_TYPE_B])
+                                           attack_methods=[ATTACK_TYPE_A, ATTACK_TYPE_B], save_results=True)
             if args.plot_pairs:
                 create_pair_plots(attack.physical_experiment_dir)
             print("Finished !!!")

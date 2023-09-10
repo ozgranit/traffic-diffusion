@@ -3,14 +3,13 @@ import cv2
 import torch.cuda
 from typing import List, Tuple
 
-import load_traffic_sign_models as traffic_model
 from inferenceAndResults.results import Results
 from models.gtsrb_model import GtsrbModel
 from models.lisa_model import LisaModel
 from settings import ATTACK_TYPE_A, ATTACK_TYPE_B, STOP_SIGN_LISA_LABEL, LISA, STOP_SIGN_GTSRB_LABEL, DEVICE, GTSRB
 
 
-def inference_folder_with_attacked_images(attack_db: str, experiment_folder: str, save_to_file_type='w', adv_model: bool = False, crop_size: int = 32):
+def inference_folder_with_attacked_images(attack_db: str, experiment_folder: str, save_results:bool = True, save_to_file_type='w', adv_model: bool = False, crop_size: int = 32):
 
     # true_label = 12 if attack_db == 'LISA' else 14
     # model, pre_process = traffic_model.load_model(attack_db, attack_type='physical', target_model='normal')
@@ -28,8 +27,9 @@ def inference_folder_with_attacked_images(attack_db: str, experiment_folder: str
 
             update_results_params(file_name, pred_label, results, true_label)
 
-    results.save_and_display(experiment_folder, save_to_file_type)
-def inference_folder_with_sub_attack_folders_with_attacked_images(attack_db: str, experiment_folder: str, attack_type: str = ATTACK_TYPE_A, save_to_file_type: str='w',
+    if save_results:
+        results.save_and_display(experiment_folder, save_to_file_type)
+def inference_folder_with_sub_attack_folders_with_attacked_images(attack_db: str, experiment_folder: str, attack_type: str = ATTACK_TYPE_A, save_results:bool = True, save_to_file_type: str='w',
                                                                   adv_model: bool = False, crop_size: int = 32):
     """
 
@@ -63,8 +63,8 @@ def inference_folder_with_sub_attack_folders_with_attacked_images(attack_db: str
                             success_at_least_one_diffusion_image_of_image_dir = True
                             results.total_diff_imgs_with_at_lease_one_diffusion_image_success += 1
 
-
-    results.save_and_display(experiment_folder, save_to_file_type=save_to_file_type)
+    if save_results:
+        results.save_and_display(experiment_folder, save_to_file_type=save_to_file_type)
 
 
 def load_model_and_set_true_label(adv_model: bool, attack_db: str, crop_size: int):
@@ -93,7 +93,8 @@ def update_results_params(file_name: str, pred_label: int, results: Results, tru
         else:
             results.total_diffusion_imgs_attacked += 1
 
-def inference_helper(device: str, experiment_folder: str, file_name: str, model: torch.nn.Module, pre_process: callable, crop_size: int = 32) -> int:
+def inference_helper(device: str, experiment_folder: str, file_name: str,
+                     model: torch.nn.Module, pre_process: callable, crop_size: int = 32) -> int:
     """
        Perform inference on an image using a PyTorch model.
 
@@ -127,7 +128,7 @@ def inference_helper(device: str, experiment_folder: str, file_name: str, model:
     #             total_img_attacked += 1
     # return total_img_attacked, total_imgs
 
-def main(attack_db: str, experiment_folder: str, attack_methods: List[str] = [ATTACK_TYPE_A, ATTACK_TYPE_B]):
+def main(attack_db: str, experiment_folder: str, attack_methods: List[str] = [ATTACK_TYPE_A, ATTACK_TYPE_B], save_results:bool = True):
     print(f"attack_db: {attack_db}")
     print("experiment_folder: ", experiment_folder)
     save_to_file_type = 'w'
@@ -136,10 +137,10 @@ def main(attack_db: str, experiment_folder: str, attack_methods: List[str] = [AT
         if i > 0:
             save_to_file_type = 'a'
         print(f"attack_method: {attack_method}")
-        inference_folder_with_sub_attack_folders_with_attacked_images(attack_db, experiment_folder, attack_method, save_to_file_type)
+        inference_folder_with_sub_attack_folders_with_attacked_images(attack_db, experiment_folder, attack_method, save_results, save_to_file_type)
         print('#' * 100)
 
 if __name__ == "__main__":
     attack_db = 'LISA'
     experiment_folder = r'/tmp/pycharm_project_250/RFLA/larger_images_experiments/physical_attack_RFLA_LISA_shape-hexagon_maxIter-200'
-    main(attack_db, experiment_folder, [ATTACK_TYPE_A, ATTACK_TYPE_B]) #, ['normal_atatck', 'special_atatck']
+    main(attack_db, experiment_folder, [ATTACK_TYPE_A, ATTACK_TYPE_B], save_results=False) #, ['normal_atatck', 'special_atatck']
