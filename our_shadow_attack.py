@@ -32,6 +32,7 @@ torch.manual_seed(random_seed)
 torch.cuda.manual_seed(random_seed)
 torch.backends.cudnn.deterministic = True
 torch.backends.cudnn.benchmark = False  # Set this to False for fully deterministic results
+torch.use_deterministic_algorithms(True)
 
 class Attack:
 

@@ -68,13 +68,13 @@ class OurPSO:
         physical: Physical / digital attack.
         pre_process: Pre-processing operations on the image.
     """
-    def __init__(self, with_EOT=False, dim: int = 6, size: int = 10,
+    def __init__(self, with_EOT: bool = False, dim: int = 6, size: int = 10,
                  iter_num: int = 100, coord_min: float = -16.,
                  coord_max: float = 48., max_speed: float = 1.5,
                  coefficient: float = .43, image: torch.Tensor = None,
                  coord: torch.Tensor = None, wrapper_models: List[BaseModel] = None,
                  targeted: bool = False, physical: bool = False, label: int = 0,
-                 pre_process=None, generated_images: List = None,
+                 pre_process: callable = None, generated_images: List = None,
                  **parameters) -> None:
         self.with_EOT = with_EOT
         self.w = 1                  # Inertia weight of PSO.

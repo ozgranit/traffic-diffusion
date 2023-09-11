@@ -16,13 +16,10 @@ from utils import shadow_edge_blur
 from utils import image_transformation
 from utils import random_param_generator
 from utils import polygon_correction
-from torchvision.transforms import Compose
 
-# with open('ShadowAttack/params.json', 'r') as config:
 with open(PARAMS_PATH, 'r') as config:
     params = json.load(config)
     device = params['device']
-
 
 class Particle:
     r"""
@@ -45,7 +42,6 @@ class Particle:
         self.speed = np.random.uniform(-max_speed, max_speed, dim)
         self.best_pos = np.zeros(dim)
         self.fitness_value = float('inf')
-
 
 class PSO:
     r"""

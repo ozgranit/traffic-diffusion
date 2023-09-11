@@ -29,11 +29,12 @@ class Results:
 
         return result
 
-    def save_and_display(self, dir_path: str, save_to_file_type: str = 'w'):
+    def save_and_display(self, dir_path: str, save_results: bool = True, save_to_file_type: str = 'w'):
         results = self.get_results()
         # Print the result
         print(results)
-        # Save the result to a file
-        path = os.path.join(dir_path, 'inference.txt')
-        with open(path, save_to_file_type) as f:
-            f.write(results)
+        if save_results:
+            # Save the result to a file
+            path = os.path.join(dir_path, 'inference.txt')
+            with open(path, save_to_file_type) as f:
+                f.write(results)

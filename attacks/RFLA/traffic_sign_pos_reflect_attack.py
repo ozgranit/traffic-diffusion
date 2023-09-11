@@ -1,24 +1,33 @@
 import argparse
-from typing import List
+from typing import List, Tuple
+
+import numpy as np
 import yaml
 import time
 import utils_rfla
 from buildData.diffusion_generated_imgs import DiffusionImages
-from buildData.traffic_data import TrafficData
+from buildData.input_data import InputData
+from datasets.larger_images.larger_images_settings import LARGER_IMAGES
+from models.gtsrb_model import GtsrbModel
 from models.lisa_model import LisaModel
 from models.base_model import BaseModel
 from inferenceAndResults import inference_on_src_attacked
 from load_images import process_image
+from plot_images import create_pair_plots
+from settings import ATTACK_TYPE_A, ATTACK_TYPE_B, LISA, GTSRB, STOP_SIGN_LISA_LABEL, STOP_SIGN_GTSRB_LABEL, DEVICE
 from utils_rfla import *
 import random
 
 # Set seed
-seed = 42  # You can use any integer value as the seed
+seed = 42
 random.seed(seed)
 torch.manual_seed(seed)
 if torch.cuda.is_available():
     torch.cuda.manual_seed(seed)
 np.random.seed(seed)
+torch.backends.cudnn.deterministic = True
+torch.backends.cudnn.benchmark = False  # Set this to False for fully deterministic results
+torch.use_deterministic_algorithms(True)
 
 class PSOAttack(object):
     def __init__(self,
@@ -28,8 +37,7 @@ class PSOAttack(object):
                  higher_bound: list,
                  v_lower: list,
                  v_higher: list,
-                 model: BaseModel = None,
-                 model_name=None,
+                 model_wrapper: List[BaseModel] = None,
                  mask=None,
                  # pre_process=None,
                  transform=None,
@@ -56,7 +64,7 @@ class PSOAttack(object):
         self.mask = mask    # binary mask. ImageNet: all one matrix
         self.image_size = image_size  # image size
         self.shape_type = shape_type  # type of geometry shape 
-        self.model = model  # the model
+        self.models_wrapper = model_wrapper  # the model
         # self.model_name = model_name
         self.transform = transform  # transformation for input of the model
         # self.pre_process = pre_process
@@ -143,7 +151,7 @@ class PSOAttack(object):
                 raise ValueError("Please select the shape in [line, triangle, rectangle, pentagon, hexagon]")
         return pops
 
-    def gen_adv_images_by_pops(self, image, pops):
+    def gen_adv_images_by_pops(self, image: np.ndarray, pops: List[Tuple]) -> np.ndarray:
         result_images = []
         for j, pop in enumerate(pops):
             image_raw = copy.deepcopy(image)
@@ -228,7 +236,7 @@ class PSOAttack(object):
             images = torch.from_numpy(images)
         return images
 
-    def initialize(self, image, label, filename="test", diffusion_imgs: DiffusionImages = None):
+    def initialize(self, image: np.ndarray, label: torch.Tensor, filename: str = "test", diffusion_imgs: DiffusionImages = None):
         image_raw = copy.deepcopy(image)
         temp = 1e+5
         temp_real = 1e+5
@@ -444,7 +452,7 @@ class PSOAttack(object):
     #     ##############33
     #     return g_fitness_sum, best_min_fitness_score_ind, best_min_fitness_score
 
-    def gen_adv_to_multiple_imgs(self, adv_images, pops, diffusion_imgs: DiffusionImages):
+    def gen_adv_to_multiple_imgs(self, adv_images: np.ndarray, pops: List[Tuple], diffusion_imgs: DiffusionImages):
 
         all_diffusion_adv_images_list = [adv_images]
         for diffusion_img, diffusion_img_name in diffusion_imgs.diffusion_images_for_attack():
@@ -456,10 +464,10 @@ class PSOAttack(object):
         return adv_images
 
     @torch.no_grad()
-    def calculate_fitness(self, images):
+    def calculate_fitness(self, images: np.ndarray) -> torch.Tensor:
         # images = self.to_tensor(images)
         if(not isinstance(images, list) and len(images.shape)==3):
-            images = self.model.pre_process_image(images)
+            images = self.models_wrapper[0].pre_process_image(images)
             # images = cv2.resize(images, (32, 32))
             # images = self.pre_process(images).unsqueeze(0).to(device)
         else:
@@ -473,22 +481,48 @@ class PSOAttack(object):
                 #                            align_corners=False)
                 # im_resized = im_resized.squeeze(0).permute(1, 2, 0)  # Reshape back to (32, 32, 3)
                 # resized_images[i] = self.pre_process(im_resized)
-                resized_images.append(self.model.pre_process_image(images[i]))
+                resized_images.append(self.models_wrapper[0].pre_process_image(images[i]))
                 # resized_images.append(self.pre_process(cv2.resize(images[i], (32, 32))))
             resized_images = torch.stack(resized_images, dim=0)
             if len(resized_images.shape) == 5:
                 resized_images = resized_images.squeeze(1)
             images = resized_images.to(device)
 
-        output = self.model.model(images.to(device))
+        images = images.to(device)
+
+        if len(self.models_wrapper) > 1:
+            output = self.get_ensemble_prediction(images)
+        else:
+            output = self.models_wrapper[0].model(images)
         softmax = torch.softmax(output, dim=1)
+
         return softmax
 
-    def calculate_omega(self, itr):
+    def get_ensemble_prediction(self, images: torch.Tensor):
+        output_all = []
+        for model_index in range(len(self.models_wrapper)):
+            output = self.models_wrapper[model_index].model(images)
+            output_all.append(output)
+
+        averaged_outputs = []
+
+        # Loop through each row (dim=0) and average the corresponding tensors
+        for row_index in range(output_all[0].shape[0]):
+            row_outputs = [output_[row_index, :] for output_ in output_all]
+            averaged_row = torch.mean(torch.stack(row_outputs, dim=0), dim=0)
+            averaged_outputs.append(averaged_row)
+
+        # Stack the averaged tensors along dim=0 to get the final result
+        final_output = torch.stack(averaged_outputs, dim=0)
+
+        return final_output
+
+
+    def calculate_omega(self, itr: int):
         omega = self.omega_bound[1] - (self.omega_bound[1] - self.omega_bound[0]) * (itr / self.max_iter)
         return omega
 
-    def update(self, image, label, itr, filename="test_update", diffusion_imgs: DiffusionImages = None):
+    def update(self, image: np.ndarray, label: torch.Tensor, itr: int, filename: str = "test_update", diffusion_imgs: DiffusionImages = None):
         c1 = c_list[0]
         c2 = c_list[1]
         c3 = c_list[2]
@@ -681,7 +715,14 @@ class PSOAttack(object):
         asr = round(100 * (success_cnt / total), 2)
         return asr
 
-    def run_pso_with_diffusion_imgs(self, file_names, orig_imgs, cropped_imgs, cropped_resized_imgs, labels, bbx, masks_cropped, attack_with_diffusion: bool): #data_loader
+    def run_pso_with_diffusion_imgs(self, file_names: List[str],
+                                    orig_imgs: List[np.ndarray],
+                                    cropped_imgs: List[np.ndarray],
+                                    cropped_resized_imgs: List[np.ndarray],
+                                    labels: List[int],
+                                    bbx: List[List[int]],
+                                    masks_cropped: List[np.ndarray],
+                                    attack_with_diffusion: bool): #data_loader
 
         total = 0
         success_cnt = 0
@@ -694,7 +735,6 @@ class PSOAttack(object):
             total += 1
             softmax_ori = self.calculate_fitness(image)
             fitness_score_ori, pred_label = torch.max(softmax_ori, dim=1)
-            # print(f"filename: {filename}.png predicted as: {pred_label.item()}")
             if attack_with_diffusion:
                 is_find_init = self.initialize(image, pred_label, filename, diffusion_imgs)
             else:
@@ -751,8 +791,6 @@ class PSOAttack(object):
                 image2saved_ = cv2.cvtColor(adv_img[0], cv2.COLOR_BGR2RGB)  # TODO: check is really needed
                 Image.fromarray(image2saved_).save(fr'{output_dir}/{diffusion_img_name}.png')
 
-
-
 def set_bounds(args: argparse.ArgumentParser) -> List[float]:
     if "line" in args.shape_type:
         args.alpha_bound = [0, 1]
@@ -776,68 +814,78 @@ def set_bounds(args: argparse.ArgumentParser) -> List[float]:
 
     return lower_bound, higher_bound
 
-if __name__ == "__main__":
+def load_wrapper_model_and_attacked_label(args: argparse.ArgumentParser):
+    """Loading model to attack and orig label.
+    loaded model will be set as args.model_wrapper
+    orig label will be set as args.attack_label"""
 
-    parser = argparse.ArgumentParser(description="Random Search Parameters")
-    ################# the file path of config.yml #################
-    parser.add_argument("--yaml_file", type=str, default="RFLA/config.yml", help="the settings config")
-    ################# load config.yml file    ##################
+    if args.model_name == LISA:
+        if args.attack_label is None or args.attack_label == 'None':
+            args.attack_label = STOP_SIGN_LISA_LABEL
+        args.model_wrapper = LisaModel(args.is_adv_model, args.image_size_feed_to_model)
+        if args.ensemble:
+            args.model_wrapper = [args.model_wrapper, LisaModel(not args.is_adv_model, args.image_size_feed_to_model)]
+        else:
+            args.model_wrapper = [args.model_wrapper]
+
+    else:
+        if args.attack_label is None or args.attack_label == 'None':
+            args.attack_label = STOP_SIGN_GTSRB_LABEL
+        args.model_wrapper = GtsrbModel(args.is_adv_model, args.image_size_feed_to_model)
+        if args.ensemble:
+            args.model_wrapper = [args.model_wrapper, GtsrbModel(not args.is_adv_model, args.image_size_feed_to_model)]
+        else:
+            args.model_wrapper = [args.model_wrapper]
+
+
+def loading_config_file(parser: argparse.ArgumentParser):
     known_args, remaining = parser.parse_known_args()
     with open(known_args.yaml_file, 'r', encoding="utf-8") as fr:
         yaml_file = yaml.safe_load(fr)
         parser.set_defaults(**yaml_file)
-    ################# assign other file in bash #################
-    parser.add_argument("--save_dir", type=str, default="RFLA/traffic_sign/saved_images")
-    # parser.add_argument("--model_name", type=str, default="LISA", help="target model name") #resnet50
-    parser.add_argument("--shape_type", type=str, default="hexagon", help="line triangle rectangle pentagon hexagon")
-    parser.add_argument("--attack_db", type=str, default=yaml_file["model_name"],
-                        help="the target dataset should be specified for a digital attack")
     args = parser.parse_args(remaining)
     print(args)
 
-    if args.attack_db == 'LISA':
-        model = LisaModel(adv_model = False)
-    experiment_dir = f'RFLA/larger_images_experiments/physical_attack_RFLA_{args.attack_db}_shape-{args.shape_type}_maxIter-{args.max_iter}'  # _EOT-{with_EOT}
+    return args
+
+
+if __name__ == "__main__":
+
+    parser = argparse.ArgumentParser(description="Random Search Parameters")
+    ################# the file path of config.yml #################
+    parser.add_argument("--yaml_file", type=str, default="attacks/RFLA/config.yml", help="the settings config")
+    ################# load config.yml file    ##################
+    args = loading_config_file(parser)
+
+    # Load wrapper model - results from function are added to args.
+    load_wrapper_model_and_attacked_label(args)
+    time_str = time.strftime("%m-%d-%H-%M", time.localtime())
+    batch_size = args.batch_size
+    device = DEVICE
+    # mask = np.ones((224, 224), dtype=np.uint8)
+
+    # Loading data
+    assert args.dataset_name == LARGER_IMAGES
+    input_data = InputData(args.dataset_name)
+    file_names, orig_imgs, cropped_imgs, cropped_resized_imgs, labels, bbx, masks_cropped = process_image(
+        input_data.input_folder,
+        input_data.annotations_folder,
+        args.model_name, crop_size=args.image_size, mask_folder=input_data.mask_folder)
+
+    # Set output dir
+    experiment_dir = os.path.join(args.output_dir, input_data.input_name.lower(),
+                                  f'physical_attack_RFLA_{args.model_name}_shape-{args.shape_type}_maxIter-{args.max_iter}_ensemble-{int(args.ensemble)}_interploate-{int(args.use_interpolate)}')
     if not os.path.exists(experiment_dir):
         os.makedirs(experiment_dir)
 
-    # if "win" in args.sys_flag:
-    #     print("win")
-    #     # image_path = "../ImageNet-NIPS2017/images"
-    #     image_path = "test_images"
-    # elif "linux" in args.sys_flag:
-    #     print('linux')
-    #     image_path = '../NIPS2017-ImageNet1K/images'
-
-    time_str = time.strftime("%m-%d-%H-%M", time.localtime())
-    # save_dir = f"{args.save_dir}/EXP_NAME_{args.shape_type}_{args.model_name}_{args.dataset_name}_{time_str}"
-
-    batch_size = args.batch_size
-
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-    # mask = np.ones((224, 224), dtype=np.uint8)
-    # image_loader = data_loader.get_image_iter(image_path, image_size=args.image_size, dataset_name=args.dataset_name)
-    #
-    # Loading data
-    data = TrafficData(attack_db = args.attack_db, crop_size = model.crop_size)
-    file_names, orig_imgs, cropped_imgs, cropped_resized_imgs, labels, bbx, masks_cropped = process_image('larger_images/image_inputs',    #kaggle_images',
-                                                                                                          # /workspace/traffic-`diffusion/
-                                                                                                          'larger_images/image_annotations',
-                                                                                                          args.attack_db, crop_size=224, mask_folder=r'larger_images/image_masks')  # /workspace/traffic-diffusion/
-    # model = get_model(args.model_name, device)
-    # transform = transforms.ToTensor()
-
     # r, x, y, alpha, red, green, blue, angle, angle
-
     lower_bound, higher_bound = set_bounds(args)
     v_higher = np.array([5, 5, 10, 0.05, 5, 5, 5, 10, 10, 10])
     v_lower = -np.array(v_higher)
     # model, pre_process = traffic_model.load_model(args.attack_db, attack_type='physical', target_model='normal')
     c_list = [args.c1, args.c2, args.c3]
     pso = PSOAttack(mask=None,
-                    model=model,
-                    model_name=args.attack_db,
+                    model_wrapper=args.model_wrapper,
                     # pre_process=pre_process,
                     image_size=args.image_size,
                     dimension=args.dimension,
@@ -851,7 +899,7 @@ if __name__ == "__main__":
                     v_lower=v_lower,
                     v_higher=v_higher,
                     shape_type=args.shape_type,
-                    save_dir=experiment_dir #save_dir
+                    save_dir=experiment_dir
                     )
 
     # # asr = pso.run_pso(file_names, orig_imgs, cropped_imgs, cropped_resized_imgs, labels, bbx, masks_cropped)
@@ -862,6 +910,7 @@ if __name__ == "__main__":
     asr_with_diffusion = pso.run_pso_with_diffusion_imgs(file_names, orig_imgs, cropped_imgs, cropped_resized_imgs, labels, bbx, masks_cropped, attack_with_diffusion=True)
     print(f"ASR with diffusion of {args.dataset_name}_{args.model_name} is: {asr_with_diffusion}")
 
-    inference_on_src_attacked.main(model.model_name, experiment_folder=experiment_dir, attack_methods=[ATTACK_TYPE_A, ATTACK_TYPE_B])
-
+    inference_on_src_attacked.main(args.model_wrapper.model_name, experiment_folder=experiment_dir, attack_methods=[ATTACK_TYPE_A, ATTACK_TYPE_B], save_results=True)
+    if args.plot_pairs:
+        create_pair_plots(experiment_dir)
     print("Finished !!!")
