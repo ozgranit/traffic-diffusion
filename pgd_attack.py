@@ -4,9 +4,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from ShadowAttack.lisa import LisaCNN
-from art_attack import LISA_NUM_OF_CLASSES
-from art_attack.my_attacks import PGDAttack
-from art_attack.image_getter import image_generator
+from pgd_attack import LISA_NUM_OF_CLASSES
+from pgd_attack.my_attacks import PGDAttack
+from pgd_attack.image_getter import image_generator
 
 
 def plot_images(images, labels, nrows, ncols):
@@ -19,11 +19,11 @@ def plot_images(images, labels, nrows, ncols):
     plt.show()
 
 
-def plot_image(image, label):
-    plt.imshow(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
-    plt.title(f"Label: {np.argmax(label)}")
-    plt.tight_layout()
-    plt.show()
+def plot_image(image, name):
+    image = imshow_batch(image)
+    plt.imshow(cv2.cvtColor(image[0], cv2.COLOR_BGR2RGB))
+    plt.axis('off')
+    plt.savefig(name, bbox_inches='tight')
 
 
 def imshow_batch(images: list | torch.Tensor):
@@ -47,43 +47,50 @@ def load_lisa_model():
     return model
 
 
-def method_b(pgd_attack, model):
+def test_attack(attack, test_images, label, model) -> tuple[int, int]:
+
+    test_success, attacked_test_success = 0, 0
+
+    for test_image in test_images:
+        test_image = [np.transpose(test_image, (2, 0, 1))]
+        test_image = torch.tensor(np.stack(test_image, axis=0)) / 255
+
+        test_pred = model(test_image).detach().numpy()
+        test_success += np.sum(np.argmax(test_pred, axis=1) == label.item()) / len(test_images)
+
+        attack_pred = model(test_image + attack).detach().numpy()
+        attacked_test_success += np.sum(np.argmax(attack_pred, axis=1) == label.item()) / len(test_images)
+
+    return test_success, attacked_test_success
+
+
+def diffusion_eot(pgd_attack, model):
     count = 0
     test_accuracy, attacked_test_accuracy = 0, 0
 
     for orig_image, train_images, test_images in image_generator(size=SIZE):
 
         count += 1
-        attacks = []
         label = torch.tensor([12])
 
-        for train_image in [orig_image] + train_images:
+        # Swap axes to PyTorch's NCHW format
+        input_images = [np.transpose(train_image, (2, 0, 1)) for train_image in [orig_image] + train_images]
+        input_images = torch.tensor(np.stack(input_images, axis=0)) / 255
 
-            # Swap axes to PyTorch's NCHW format
-            input_image = [np.transpose(train_image, (2, 0, 1))]
-            input_image = torch.tensor(np.stack(input_image, axis=0)) / 255
+        x_adv = pgd_attack.execute(input_images, label)
+        attack_only = x_adv.detach().numpy() - input_images.detach().numpy()
 
-            x_adv = pgd_attack.execute(input_image, torch.tensor([11]), targeted=True)
-            attack_only = x_adv.detach().numpy() - input_image.detach().numpy()
-            attacks.append(attack_only)
-
-        final_attack = np.mean(attacks, axis=0)
+        final_attack = np.mean(attack_only, axis=0)
         # apply attack to test images
-        for test_image in test_images:
-            test_image = [np.transpose(test_image, (2, 0, 1))]
-            test_image = torch.tensor(np.stack(test_image, axis=0)) / 255
-
-            test_pred = model(test_image).detach().numpy()
-            test_accuracy += np.sum(np.argmax(test_pred, axis=1) == label.item()) / len(test_images)
-
-            attack_pred = model(test_image + final_attack).detach().numpy()
-            attacked_test_accuracy += np.sum(np.argmax(attack_pred, axis=1) == label.item()) / len(test_images)
+        test_success, attacked_test_success = test_attack(final_attack, test_images, label, model)
+        test_accuracy += test_success
+        attacked_test_accuracy += attacked_test_success
 
     print(f'Accuracy on test images: {test_accuracy * 100 / count}%')
     print(f'Accuracy on EOT attacked test images: {attacked_test_accuracy * 100 / count}%')
 
 
-def method_a(pgd_attack, model):
+def baseline(pgd_attack, model):
 
     images_for_plot, labels_for_plot, adv_images_for_plot, adv_labels_for_plot = [], [], [], []
     orig_accuracy, adv_accuracy, count = 0, 0, 0
@@ -111,15 +118,9 @@ def method_a(pgd_attack, model):
 
         # apply attack to test images
         attack_only = x_adv.detach().numpy() - input_image.detach().numpy()
-        for test_image in test_images:
-            test_image = [np.transpose(test_image, (2, 0, 1))]
-            test_image = torch.tensor(np.stack(test_image, axis=0)) / 255
-
-            test_pred = model(test_image).detach().numpy()
-            test_accuracy += np.sum(np.argmax(test_pred, axis=1) == label.item()) / len(test_images)
-
-            attack_pred = model(test_image + attack_only).detach().numpy()
-            attacked_test_accuracy += np.sum(np.argmax(attack_pred, axis=1) == label.item()) / len(test_images)
+        test_success, attacked_test_success = test_attack(attack_only, test_images, label, model)
+        test_accuracy += test_success
+        attacked_test_accuracy += attacked_test_success
 
     print(f'Accuracy on benign examples: {orig_accuracy * 100 / count}%')
     print(f'Accuracy on adversarial examples: {adv_accuracy * 100 / count}%')
@@ -134,19 +135,7 @@ def method_a(pgd_attack, model):
 SIZE = 224
 
 if __name__ == "__main__":
-    # TODO: https://github.com/adverML/synthesizing_robust_adversarial/blob/main/main.ipynb
     model = load_lisa_model()
-    pgd_attack = PGDAttack(model=model, eps=12/255, n=50)
-    # pgd_attack = PGDAttack(model=model, eps=12/255, n=50), baseline:
-    # Accuracy on benign examples: 96.0%
-    # Accuracy on adversarial examples: 64.0%
-    # Accuracy on test images: 99.33333333333348%
-
-    # Accuracy on attacked test images: 97.33333333333347%
-    # Accuracy on EOT attacked test images: 96.00000000000013%
-    # size 224:
-    # Accuracy on attacked test images: 97.33333333333347%
-    # Accuracy on EOT attacked test images: 96.00000000000013%
-
-    method_a(pgd_attack, model)
-    method_b(pgd_attack, model)
+    pgd_attack = PGDAttack(model=model, eps=30/255, n=250)
+    baseline(pgd_attack, model)
+    diffusion_eot(pgd_attack, model)

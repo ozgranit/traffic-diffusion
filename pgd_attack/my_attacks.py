@@ -54,8 +54,10 @@ class PGDAttack:
                 elif targeted and (torch.argmax(outputs, dim=1) == y).all():
                     break
 
+            # Calculate average output over transformations
+            average_along_batch = torch.unsqueeze(torch.mean(outputs, dim=0), 0)
             # Calculate loss
-            loss = self.loss_func(outputs, y)
+            loss = self.loss_func(average_along_batch, y)
             if targeted:
                 loss = -loss
             # Update adversarial images

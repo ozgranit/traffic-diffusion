@@ -1,6 +1,6 @@
 import numpy as np
 from PIL import Image
-from art_attack import LISA_NUM_OF_CLASSES
+from pgd_attack import LISA_NUM_OF_CLASSES
 import matplotlib.pyplot as plt
 from pathlib import Path
 from shadow_attack_kaggle_images import load_generated_augmentations_by_type
