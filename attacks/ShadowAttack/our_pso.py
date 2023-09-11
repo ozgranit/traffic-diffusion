@@ -184,15 +184,11 @@ class OurPSO:
                 predictions.append(predict)
             predict = torch.mean(torch.stack(predictions), dim=0)
 
-            # predict = torch.softmax(self.wrapper_models[0].model(img), 1)
-            # predict = torch.mean(predict, dim=0)
-
         if self.targeted:
             target = parameters.get("target")
             confidence = float(1 - predict[target])
             success = torch.argmax(predict) == target
         else:
-            confidence = float(predict[self.label])
             confidence = float(predict[self.label])
             success = torch.argmax(predict) != self.label
 

@@ -103,6 +103,9 @@ class Attack:
 
         assert self.attack_type in ['digital', 'physical']
 
+        if self.ensemble and not self.our_attack:
+            raise Exception("In paper's attack ensemble was not implemented")
+
     def attack(self, attack_image: np.ndarray, label: int, coords: Tuple[np.ndarray, np.ndarray],
                targeted_attack: bool = False,
                physical_attack: bool=False, **parameters):
@@ -221,7 +224,7 @@ class Attack:
 
         total_orig_success = 0
         total_orig_images = len(file_names)
-        self.physical_experiment_dir = f'{self.output_dir}/physical_attack_untargeted-{int(self.untargeted_only)}_{self.attack_model_name}_EOT-{int(self.with_EOT)}_ensemble-{int(self.ensemble)}_shadowLevel-{self.shadow_level}_iter-{self.iter_num}'
+        self.physical_experiment_dir = f'{self.output_dir}/physical_attack_untargeted-{int(self.untargeted_only)}_{self.attack_model_name}_EOT-{int(self.with_EOT)}_ensemble-{int(self.ensemble)}_shadowLevel-{self.shadow_level}_iter-{self.iter_num}_tmpppp'
         fixed_mask = None
         if input_data.mask_folder is None:
             mask_path = r'octagon_mask.png'
@@ -329,7 +332,6 @@ class Attack:
                 output_dir = diffusion_imgs.output_dir_special
             else:
                 output_dir = diffusion_imgs.output_dir_normal
-        #     print("output_dir: ", output_dir)
             os.makedirs(output_dir, exist_ok=True)
             cv2.imwrite(f"{output_dir}/{image_name}.png", adv_image)
 
@@ -353,7 +355,7 @@ if __name__ == '__main__':
                         help="Shadow coefficient k")
     parser.add_argument("--input_data_name", type=str, default=LARGER_IMAGES,
                         help=f"If you use InputData then you can set {LARGER_IMAGES} or '{KAGGLE_IMAGES}'")
-    parser.add_argument("--attack_model_name", type=str, default=GTSRB,
+    parser.add_argument("--attack_model_name", type=str, default=LISA,
                         help="The target dataset should be specified for a digital attack")
     parser.add_argument("--attack_type", type=str, default="physical",
                         help="Digital attack or physical attack")
@@ -362,7 +364,7 @@ if __name__ == '__main__':
                         help=f"A file path OR input_data class to the target image/folder should be specified for a physical attack. "
                              "WARNING: If arg `input_data_name` is not None then this param will be ignored")
     parser.add_argument("--mask_path", type=str, default="attacks/ShadowAttack/tmp/gtsrb_30_mask.png",
-                        help="A file path to the mask should be specified for a physical attack")
+                        help="A file path to the mask should be specified for a physical attack if input_data class is not used")
     parser.add_argument("--image_label", default=None,
                         help="Type: int."
                              "A ground truth should be specified for a physical attack, if None, takes label for stop sign depends on model Lisa or Gtsrb")
@@ -376,25 +378,20 @@ if __name__ == '__main__':
                         help="Usually 100 for normal attack and 200 for physical attack")
     parser.add_argument("--crop_size", type=int, default=32,
                         help="Image size before feed in to the model")
-    parser.add_argument("--output_dir", type=str, default="experiments/_tmp_/shadowAttack", #rf'experiments/{input_data.input_name}',
+    parser.add_argument("--output_dir", type=str, default="experiments/_tmp_/shadowAttack",
                         help="Folder path to dave output")
     parser.add_argument("--our_attack", type=str2bool, default=True,
-                        # action="store_true",
                         help="Should apply our attack, if True please put a folder in image_path otherwise a path for an image")
     parser.add_argument("--with_EOT", type=str2bool, default=False,
-                        # action="store_true",
                         help="Weather to apply EOT transformations")
-    parser.add_argument("--untargeted_only", type=str2bool, default=False,
-                        # action="store_true",
+    parser.add_argument("--untargeted_only", type=str2bool, default=True,
                         help="Weather to apply stabilization attack")
     parser.add_argument("--ensemble", type=str2bool, default=False,
-                        # action="store_true",
                         help="If True then the attack is applied against both regular and robust(model_adv) models")
     parser.add_argument("--transform_num", type=int, default=0,
                         help="Number of EOT transformations. "
                              "If our physical attack is applied then transform_num for normal attack will be expanded to match number of total transformed images")
     parser.add_argument("--plot_pairs", type=str2bool, default= False,
-                        # action="store_true",
                         help="If True then the attack is applied against both regular and robust(model_adv) models")
 
     args = parser.parse_args()
