@@ -910,7 +910,7 @@ if __name__ == "__main__":
     asr_with_diffusion = pso.run_pso_with_diffusion_imgs(file_names, orig_imgs, cropped_imgs, cropped_resized_imgs, labels, bbx, masks_cropped, attack_with_diffusion=True)
     print(f"ASR with diffusion of {args.dataset_name}_{args.model_name} is: {asr_with_diffusion}")
 
-    inference_on_src_attacked.main(args.model_wrapper.model_name, experiment_folder=experiment_dir, attack_methods=[ATTACK_TYPE_A, ATTACK_TYPE_B], save_results=True)
+    inference_on_src_attacked.main(args.model_wrapper[0].model_name, experiment_folder=experiment_dir, attack_methods=[ATTACK_TYPE_A, ATTACK_TYPE_B], save_results=True)
     if args.plot_pairs:
         create_pair_plots(experiment_dir)
     print("Finished !!!")
