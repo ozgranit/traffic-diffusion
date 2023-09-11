@@ -176,8 +176,16 @@ class OurPSO:
             img = self.pre_process(img).to(device)
 
         with torch.no_grad():
-            predict = torch.softmax(self.wrapper_models[0].model(img), 1)
-            predict = torch.mean(predict, dim=0)
+            predictions = []
+            for wrapper_model in self.wrapper_models:
+                model = wrapper_model.model
+                predict = torch.softmax(model(img), 1)
+                predict = torch.mean(predict, dim=0)
+                predictions.append(predict)
+            predict = torch.mean(torch.stack(predictions), dim=0)
+
+            # predict = torch.softmax(self.wrapper_models[0].model(img), 1)
+            # predict = torch.mean(predict, dim=0)
 
         if self.targeted:
             target = parameters.get("target")
