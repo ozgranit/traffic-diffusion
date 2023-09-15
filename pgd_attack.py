@@ -4,9 +4,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from ShadowAttack.lisa import LisaCNN
-from pgd_attack import LISA_NUM_OF_CLASSES
-from pgd_attack.my_attacks import PGDAttack
-from pgd_attack.image_getter import image_generator
+from attacks.pgd_attack import LISA_NUM_OF_CLASSES
+from attacks.pgd_attack import PGDAttack
+from attacks.pgd_attack.image_getter import image_generator
 
 
 def plot_images(images, labels, nrows, ncols):
