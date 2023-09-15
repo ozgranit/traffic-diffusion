@@ -8,16 +8,16 @@ from models.gtsrb_model import GtsrbModel
 from models.lisa_model import LisaModel
 from settings import ATTACK_TYPE_A, ATTACK_TYPE_B, STOP_SIGN_LISA_LABEL, LISA, STOP_SIGN_GTSRB_LABEL, DEVICE, GTSRB
 
-def inference_folder_with_attacked_images(attack_db: str, experiment_folder: str,
+def inference_folder_with_attacked_images(model_name: str, experiment_folder: str,
                                           save_results: bool = True, save_to_file_type='w',
-                                          adv_model: bool = False, crop_size: int = 32):
+                                          is_adv_model: bool = False, crop_size: int = 32):
 
     # true_label = 12 if attack_db == 'LISA' else 14
     # model, pre_process = traffic_model.load_model(attack_db, attack_type='physical', target_model='normal')
-    model_wrapper, true_label = load_model_and_set_true_label(adv_model, attack_db, crop_size)
+    model_wrapper, true_label = load_model_and_set_true_label(is_adv_model, model_name, crop_size)
 
 
-    results = Results()
+    results = Results(model_name, experiment_folder, is_adv_model)
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     for file_name in os.listdir(experiment_folder):
         if file_name.endswith("png"):
@@ -29,26 +29,28 @@ def inference_folder_with_attacked_images(attack_db: str, experiment_folder: str
             update_results_params(file_name, pred_label, results, true_label)
 
     results.save_and_display(experiment_folder, save_results, save_to_file_type)
-def inference_folder_with_sub_attack_folders_with_attacked_images(attack_db: str, experiment_folder: str, attack_type: str = ATTACK_TYPE_A,
+def inference_folder_with_sub_attack_folders_with_attacked_images(model_name: str, experiment_folder: str, attack_type: str = ATTACK_TYPE_A,
                                                                   save_results: bool = True, save_to_file_type: str='w',
-                                                                  adv_model: bool = False, crop_size: int = 32):
+                                                                  is_adv_model: bool = False, crop_size: int = 32):
     """
 
     Args:
-        attack_db: 'LISA' or 'GTSRB'
-        experiment_folder:
-        attack_type:
-
+        model_name: 'LISA' or 'GTSRB'
+        experiment_folder: path to experiment_folder
+        attack_type: METHOD_A or METHOD_B
+        save_results: if True then results are saved to file in the experiment_folder
+        save_to_file_type: if 'w' then starts a new document, if 'a' append to existing document if exists otherwise starts a new one
+        is_adv_model: if True then adv ('robust') model is used, if False then 'normal' model is used
+        crop_size: size of image before feeding to the model
     Returns:
 
     """
 
-    results = Results()
-    model_wrapper, true_label = load_model_and_set_true_label(adv_model, attack_db, crop_size)
-    # model, pre_process = traffic_model.load_model(attack_db, attack_type='physical', target_model='normal')
+    results = Results(model_name, experiment_folder, is_adv_model)
+    model_wrapper, true_label = load_model_and_set_true_label(is_adv_model, model_name, crop_size)
     device = DEVICE
     for file_dir_name in os.listdir(experiment_folder):
-        if file_dir_name != 'black_box':
+        if file_dir_name.lower() != 'black_box':
             success_at_least_one_diffusion_image_of_image_dir = False
             file_dir = os.path.join(experiment_folder, file_dir_name)
             if os.path.isdir(file_dir):
@@ -56,7 +58,7 @@ def inference_folder_with_sub_attack_folders_with_attacked_images(attack_db: str
                 for file_name in os.listdir(images_folder):
                     if file_name.endswith("png"):
                         results.total_images += 1
-                        pred_label_ = inference_helper(device, images_folder, file_name, model_wrapper.model, model_wrapper.pre_process_image)  #TODO: remove this line
+                        # pred_label_ = inference_helper(device, images_folder, file_name, model_wrapper.model, model_wrapper.pre_process_image)  #TODO: remove this line
                         image_path = os.path.join(images_folder, file_name)
                         confidence, pred_label, attack_failed, msg = model_wrapper.test_single_image(image_path, true_label, print_results=False)
                         update_results_params(file_name, pred_label, results, true_label)
@@ -64,7 +66,7 @@ def inference_folder_with_sub_attack_folders_with_attacked_images(attack_db: str
                             success_at_least_one_diffusion_image_of_image_dir = True
                             results.total_diff_imgs_with_at_lease_one_diffusion_image_success += 1
 
-    results.save_and_display(experiment_folder, save_results, save_to_file_type=save_to_file_type)
+    results.save_and_display(experiment_folder, save_results, save_to_file_type=save_to_file_type, is_adv_model= is_adv_model)
 
 
 def load_model_and_set_true_label(adv_model: bool, attack_db: str, crop_size: int):
@@ -128,21 +130,20 @@ def inference_helper(device: str, experiment_folder: str, file_name: str,
     #             total_img_attacked += 1
     # return total_img_attacked, total_imgs
 
-def main(attack_db: str, experiment_folder: str, attack_methods: List[str] = [ATTACK_TYPE_A, ATTACK_TYPE_B],
-         save_results: bool = True):
-    print(f"attack_db: {attack_db}")
-    print("experiment_folder: ", experiment_folder)
-    save_to_file_type = 'w'
+def main(model_name: str, experiment_folder: str, attack_methods: List[str] = [ATTACK_TYPE_A, ATTACK_TYPE_B],
+         save_results: bool = True, save_to_file_type: str = 'w', is_adv_model: bool = False):
+    print(f"Model name: {model_name}, Is adv (robust) model: {is_adv_model}")
+    print("Experiment_folder: ", experiment_folder)
 
     for i, attack_method in enumerate(attack_methods):
         if i > 0:
             save_to_file_type = 'a'
         print(f"attack_method: {attack_method}")
-        inference_folder_with_sub_attack_folders_with_attacked_images(attack_db, experiment_folder, attack_method, save_results, save_to_file_type)
+        inference_folder_with_sub_attack_folders_with_attacked_images(model_name, experiment_folder, attack_method, save_results, save_to_file_type, is_adv_model)
         print('#' * 100)
 
 if __name__ == "__main__":
-    attack_db = LISA
-    experiment_folder = r'/tmp/pycharm_project_250/RFLA/larger_images_experiments/physical_attack_RFLA_LISA_shape-hexagon_maxIter-200'
-    experiment_folder = r'experiments/shadowAttack/larger_images/physical_attack_untargeted-1_LISA_EOT-0_ensemble-0_shadowLevel-0.43_iter-200'
-    main(attack_db, experiment_folder, [ATTACK_TYPE_A, ATTACK_TYPE_B], save_results=False) #, ['normal_atatck', 'special_atatck']
+    model_name = GTSRB
+    adv_model = False
+    experiment_folder = r'experiments/RFLA/larger_images/physical_attack_RFLA_GTSRB_isAdv-1_shape-hexagon_maxIter-200_ensemble-0_interploate-0'
+    main(model_name, experiment_folder, [ATTACK_TYPE_A, ATTACK_TYPE_B], save_results=False, save_to_file_type='w', is_adv_model=adv_model) #, ['normal_atatck', 'special_atatck']

@@ -107,8 +107,10 @@ class OurPSO:
     def prepare_single_image_with_no_transformation_for_physical_attack(self, image, shadow_position, pos_list, shadow_level, shadow_edge_blur_coefficient):
         adv_img, shadow_area = draw_shadow(shadow_position, image, pos_list, shadow_level)
         adv_img = shadow_edge_blur(adv_img, shadow_area, shadow_edge_blur_coefficient)
-        adv_img = cv2.resize(adv_img, (32, 32))
-        adv_img = self.pre_process(adv_img)
+        use_interpolate = self.wrapper_models[0].use_interpolate
+        if not use_interpolate:
+            adv_img = cv2.resize(adv_img, (32, 32))
+        adv_img = self.pre_process(adv_img, use_interpolate=use_interpolate)
 
         return adv_img
 

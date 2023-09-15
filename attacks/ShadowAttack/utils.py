@@ -238,7 +238,8 @@ def random_param_generator(num, w, h):
 
 
 def image_transformation(image, position, pos_list, motion_degree, motion_angle, size_mul,
-                         brightness_mul, shadow_mul, shadow_move, perspective_mat, pre_process):
+                         brightness_mul, shadow_mul, shadow_move, perspective_mat, pre_process, use_interpolate = False):
+
     transform_num = len(motion_degree)
     if len(motion_degree) == 1 and motion_degree[0]==0:
         transform_num = 0
@@ -277,8 +278,9 @@ def image_transformation(image, position, pos_list, motion_degree, motion_angle,
         res_images.append(adv_img)
 
     for i in range(transform_num):
-        res_images[i] = cv2.resize(res_images[i], (32, 32))
-        res_images[i] = pre_process(res_images[i])
+        if not use_interpolate:
+            res_images[i] = cv2.resize(res_images[i], (32, 32))
+        res_images[i] = pre_process(res_images[i], use_interpolate=use_interpolate)
 
     if transform_num == 0:
         i=0
@@ -288,8 +290,9 @@ def image_transformation(image, position, pos_list, motion_degree, motion_angle,
         adv_img, shadow_area = draw_shadow(shadow_position, image, pos_list, shadow_mul[i])
         adv_img = shadow_edge_blur(adv_img, shadow_area, 5)
         res_images.append(adv_img)
-        res_images[i] = cv2.resize(res_images[i], (32, 32))
-        res_images[i] = pre_process(res_images[i])
+        if not use_interpolate:
+            res_images[i] = cv2.resize(res_images[i], (32, 32))
+        res_images[i] = pre_process(res_images[i], use_interpolate=use_interpolate)
 
     if len(res_images) == 1:
         return res_images[0]

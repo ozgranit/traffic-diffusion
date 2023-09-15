@@ -224,7 +224,7 @@ class Attack:
 
         total_orig_success = 0
         total_orig_images = len(file_names)
-        self.physical_experiment_dir = f'{self.output_dir}/physical_attack_untargeted-{int(self.untargeted_only)}_{self.attack_model_name}_EOT-{int(self.with_EOT)}_ensemble-{int(self.ensemble)}_shadowLevel-{self.shadow_level}_iter-{self.iter_num}_tmpppp'
+        self.physical_experiment_dir = f'{self.output_dir}/physical_attack_untargeted-{int(self.untargeted_only)}_{self.attack_model_name}_isAdv-{int(self.is_adv_model)}_EOT-{int(self.with_EOT)}_ensemble-{int(self.ensemble)}_shadowLevel-{self.shadow_level}_iter-{self.iter_num}'
         fixed_mask = None
         if input_data.mask_folder is None:
             mask_path = r'octagon_mask.png'
@@ -412,9 +412,18 @@ if __name__ == '__main__':
 
             asr_orig_with_diffusion = attack.our_attack_physical_wrapper(attack_with_diffusion= True)
             print(f"ASR orig with diffusion is: {asr_orig_with_diffusion}")
-
+            is_adv_model = False if args.target_model == 'normal' else True
             inference_on_src_attacked.main(attack.model_wrapper[0].model_name, experiment_folder=attack.physical_experiment_dir,
-                                           attack_methods=[ATTACK_TYPE_A, ATTACK_TYPE_B], save_results=True)
+                                           attack_methods=[ATTACK_TYPE_A, ATTACK_TYPE_B], save_results=True, is_adv_model=is_adv_model)
+            if args.ensemble:
+                # Currently we have at most 2 models in the ensemble
+                inference_on_src_attacked.main(attack.model_wrapper[1].model_name,
+                                               experiment_folder=attack.physical_experiment_dir,
+                                               attack_methods=[ATTACK_TYPE_A, ATTACK_TYPE_B],
+                                               save_results=True,
+                                               save_to_file_type='a',
+                                               is_adv_model=not is_adv_model)
+
             if args.plot_pairs:
                 create_pair_plots(attack.physical_experiment_dir)
             print("Finished !!!")

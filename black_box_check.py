@@ -4,23 +4,24 @@ import cv2
 import pandas as pd
 import numpy as np
 from attacks.ShadowAttack import gtsrb, lisa
+from attacks.ShadowAttack.shadow_attack_settings import PARAMS_PATH, MODEL_PATH
 from attacks.ShadowAttack.utils import pre_process_image
 from torchvision import transforms
 import json
 
-from settings import GTSRB, LISA
+from settings import GTSRB, LISA, ATTACK_TYPE_A, ATTACK_TYPE_B
 
-with open('attacks/ShadowAttack/params.json', 'rb') as f:
+with open(PARAMS_PATH, 'rb') as f:
     params = json.load(f)
-    class_n_gtsrb = params['GTSRB']['class_n']
-    class_n_lisa = params['LISA']['class_n']
+    class_n_gtsrb = params[GTSRB]['class_n']
+    class_n_lisa = params[LISA]['class_n']
     device = params['device']
     # position_list, mask_list = load_mask()
 
-def predict_image(image, model, description="", print_results=True, attack_db='LISA'):
+def predict_image(image: np.ndarray, model: torch.nn, description="", print_results=True, model_name='LISA'):
     with torch.no_grad():
         img_ = cv2.resize(image, (32, 32))
-        if attack_db == 'GTSRB':
+        if model_name == GTSRB:
             img_ = pre_process_image(img_).astype(np.float32)
         img_ = transforms.ToTensor()(img_)
         img_ = img_.unsqueeze(0).to(device)
@@ -33,25 +34,24 @@ def predict_image(image, model, description="", print_results=True, attack_db='L
 
         return predict_.max(1)
 
-def perform_inference(image_path, model):
-    # Load and preprocess the image
-    img = cv2.imread(image_path)
-    img = cv2.resize(img, (48, 48))  # Resize to the model's input size
-    img = img / 255.0  # Normalize pixel values
+# def perform_inference(image_path: str, model: torch.nn) -> bool:
+#     # Load and preprocess the image
+#     img = cv2.imread(image_path)
+#     img = cv2.resize(img, (48, 48))  # Resize to the model's input size
+#     img = img / 255.0  # Normalize pixel values
+#
+#     # Perform inference
+#     prediction = model.predict(np.expand_dims(img, axis=0))
+#     predicted_class = np.argmax(prediction)
+#
+#     # Return True if the predicted class is 14 (or False otherwise)
+#     return predicted_class == 14
 
-    # Perform inference
-    prediction = model.predict(np.expand_dims(img, axis=0))
-    predicted_class = np.argmax(prediction)
 
-    # Return True if the predicted class is 14 (or False otherwise)
-    return predicted_class == 14
-
-
-def load_model(attack_db):
+def load_model(model_name: str) -> [torch.nn, callable]:
     target_model = 'normal'
-    assert attack_db in ['LISA', 'GTSRB']
-    assert attack_db in ['LISA', 'GTSRB']
-    if attack_db == "LISA":
+    assert model_name in [LISA, GTSRB]
+    if model_name == LISA:
         model = lisa.LisaCNN(n_class=class_n_lisa).to(device)
         model.load_state_dict(
             # torch.load(f'{MODEL_PATH}/{"adv_" if target_model == "robust" else ""}model_lisa.pth',
@@ -68,7 +68,7 @@ def load_model(attack_db):
             pre_process_image, transforms.ToTensor()])
     model.eval()
 
-    return model
+    return model, pre_process
 
 
 def inference_on_experiment(base_dir, model_name):
@@ -127,7 +127,7 @@ def inference_on_experiment(base_dir, model_name):
                                 total_gen_imgs+=1
                             img = cv2.imread(img_path)
                             # Perform inference and store the result in the dictionary
-                            prob, label = predict_image(img, model, description=attack_type, print_results=False, attack_db=model_name)
+                            prob, label = predict_image(img, model, description=attack_type, print_results=False, model_name=model_name)
                             probability = prob.item()
                             label = label.item()
                             column_name_label = f"{attack_type}_{image_type}_Label"
@@ -181,7 +181,7 @@ if __name__ == "__main__":
     # experiment_dir = r'larger_images/physical_attack_untar_mask_equal_split_GTSRB_EOT-False_iter-300'
 
     # # Checking LISA attack on GTSRB
-    model_name = GTSRB | LISA
+    model_name = GTSRB  #| LISA
     experiment_dir = r'/tmp/pycharm_project_250/larger_images/experiments/physical_attack_untargeted_mask_equal_split_LISA_EOT-False_iter-200_level-0.43'
 
     attack_method = ATTACK_TYPE_A     #"normal_atatck

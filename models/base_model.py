@@ -9,9 +9,15 @@ import torch
 
 from attacks.ShadowAttack.shadow_attack_settings import PARAMS_PATH
 from attacks.ShadowAttack.utils import load_mask
+from settings import DEVICE
 
 
 class BaseModel(ABC):
+
+    def __init__(self, crop_size: int, use_interpolate: bool = False):
+        self.device = DEVICE
+        self.crop_size = crop_size
+        self.use_interpolate = use_interpolate
 
     def load_params(self, model_name: str):
         """
@@ -34,7 +40,7 @@ class BaseModel(ABC):
             msg = ''
             img = self.load_img_if_needed(img)
             # img is already loaded
-            img = self.pre_process_image(img, crop_size=(self.crop_size, self.crop_size), device=self.device)
+            img = self.pre_process_image(img, crop_size=(self.crop_size, self.crop_size), device=self.device, use_interpolate=self.use_interpolate)
             confidence, pred_label = self.__predict_img(img)
 
             if ground_truth:

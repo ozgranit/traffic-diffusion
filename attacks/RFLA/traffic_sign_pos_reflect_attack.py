@@ -1,7 +1,6 @@
 import argparse
 from typing import List, Tuple
 
-import numpy as np
 import yaml
 import time
 import utils_rfla
@@ -465,24 +464,13 @@ class PSOAttack(object):
 
     @torch.no_grad()
     def calculate_fitness(self, images: np.ndarray) -> torch.Tensor:
-        # images = self.to_tensor(images)
         if(not isinstance(images, list) and len(images.shape)==3):
-            images = self.models_wrapper[0].pre_process_image(images)
-            # images = cv2.resize(images, (32, 32))
-            # images = self.pre_process(images).unsqueeze(0).to(device)
+            images = self.models_wrapper[0].pre_process_image(images, device=DEVICE, use_interpolate=self.models_wrapper[0].use_interpolate)
         else:
-            # resized_images=np.zeros((images.shape[0], *images.shape[1:][::-1]))
             resized_images=[]
-            #torch.zeros((images.shape[0], 3, 32, 32)) #TODO: no hardcoded
             num_of_images = len(images) if isinstance(images, list) else images.shape[0]
             for i in range(num_of_images):
-                # Resize the image to (32, 32)
-                # im_resized = F.interpolate(images[i].permute(2, 0, 1).unsqueeze(0), size=(32, 32), mode='bilinear',
-                #                            align_corners=False)
-                # im_resized = im_resized.squeeze(0).permute(1, 2, 0)  # Reshape back to (32, 32, 3)
-                # resized_images[i] = self.pre_process(im_resized)
-                resized_images.append(self.models_wrapper[0].pre_process_image(images[i]))
-                # resized_images.append(self.pre_process(cv2.resize(images[i], (32, 32))))
+                resized_images.append(self.models_wrapper[0].pre_process_image(images[i], device=DEVICE, use_interpolate=self.models_wrapper[0].use_interpolate))
             resized_images = torch.stack(resized_images, dim=0)
             if len(resized_images.shape) == 5:
                 resized_images = resized_images.squeeze(1)
@@ -491,10 +479,10 @@ class PSOAttack(object):
         images = images.to(device)
 
         if len(self.models_wrapper) > 1:
-            output = self.get_ensemble_prediction(images)
+            softmax = self.get_ensemble_prediction(images)
         else:
             output = self.models_wrapper[0].model(images)
-        softmax = torch.softmax(output, dim=1)
+            softmax = torch.softmax(output, dim=1)
 
         return softmax
 
@@ -502,7 +490,8 @@ class PSOAttack(object):
         output_all = []
         for model_index in range(len(self.models_wrapper)):
             output = self.models_wrapper[model_index].model(images)
-            output_all.append(output)
+            softmax = torch.softmax(output, dim=1)
+            output_all.append(softmax)
 
         averaged_outputs = []
 
@@ -822,18 +811,18 @@ def load_wrapper_model_and_attacked_label(args: argparse.ArgumentParser):
     if args.model_name == LISA:
         if args.attack_label is None or args.attack_label == 'None':
             args.attack_label = STOP_SIGN_LISA_LABEL
-        args.model_wrapper = LisaModel(args.is_adv_model, args.image_size_feed_to_model)
+        args.model_wrapper = LisaModel(args.is_adv_model, args.image_size_feed_to_model, args.use_interpolate)
         if args.ensemble:
-            args.model_wrapper = [args.model_wrapper, LisaModel(not args.is_adv_model, args.image_size_feed_to_model)]
+            args.model_wrapper = [args.model_wrapper, LisaModel(not args.is_adv_model, args.image_size_feed_to_model, args.use_interpolate)]
         else:
             args.model_wrapper = [args.model_wrapper]
 
     else:
         if args.attack_label is None or args.attack_label == 'None':
             args.attack_label = STOP_SIGN_GTSRB_LABEL
-        args.model_wrapper = GtsrbModel(args.is_adv_model, args.image_size_feed_to_model)
+        args.model_wrapper = GtsrbModel(args.is_adv_model, args.image_size_feed_to_model, args.use_interpolate)
         if args.ensemble:
-            args.model_wrapper = [args.model_wrapper, GtsrbModel(not args.is_adv_model, args.image_size_feed_to_model)]
+            args.model_wrapper = [args.model_wrapper, GtsrbModel(not args.is_adv_model, args.image_size_feed_to_model, args.use_interpolate)]
         else:
             args.model_wrapper = [args.model_wrapper]
 
@@ -862,7 +851,6 @@ if __name__ == "__main__":
     time_str = time.strftime("%m-%d-%H-%M", time.localtime())
     batch_size = args.batch_size
     device = DEVICE
-    # mask = np.ones((224, 224), dtype=np.uint8)
 
     # Loading data
     assert args.dataset_name == LARGER_IMAGES
@@ -874,7 +862,7 @@ if __name__ == "__main__":
 
     # Set output dir
     experiment_dir = os.path.join(args.output_dir, input_data.input_name.lower(),
-                                  f'physical_attack_RFLA_{args.model_name}_shape-{args.shape_type}_maxIter-{args.max_iter}_ensemble-{int(args.ensemble)}_interploate-{int(args.use_interpolate)}')
+                                  f'physical_attack_RFLA_{args.model_name}_isAdv-{int(args.is_adv_model)}_shape-{args.shape_type}_maxIter-{args.max_iter}_ensemble-{int(args.ensemble)}_interploate-{int(args.use_interpolate)}')
     if not os.path.exists(experiment_dir):
         os.makedirs(experiment_dir)
 
@@ -882,7 +870,6 @@ if __name__ == "__main__":
     lower_bound, higher_bound = set_bounds(args)
     v_higher = np.array([5, 5, 10, 0.05, 5, 5, 5, 10, 10, 10])
     v_lower = -np.array(v_higher)
-    # model, pre_process = traffic_model.load_model(args.attack_db, attack_type='physical', target_model='normal')
     c_list = [args.c1, args.c2, args.c3]
     pso = PSOAttack(mask=None,
                     model_wrapper=args.model_wrapper,
@@ -906,11 +893,18 @@ if __name__ == "__main__":
 
     asr_without_diffusion = pso.run_pso_with_diffusion_imgs(file_names, orig_imgs, cropped_imgs, cropped_resized_imgs, labels, bbx, masks_cropped, attack_with_diffusion=False)
     print(f"ASR without diffusion of {args.dataset_name}_{args.model_name} is: {asr_without_diffusion}")
-
+    #
     asr_with_diffusion = pso.run_pso_with_diffusion_imgs(file_names, orig_imgs, cropped_imgs, cropped_resized_imgs, labels, bbx, masks_cropped, attack_with_diffusion=True)
     print(f"ASR with diffusion of {args.dataset_name}_{args.model_name} is: {asr_with_diffusion}")
 
-    inference_on_src_attacked.main(args.model_wrapper[0].model_name, experiment_folder=experiment_dir, attack_methods=[ATTACK_TYPE_A, ATTACK_TYPE_B], save_results=True)
+    inference_on_src_attacked.main(args.model_wrapper[0].model_name, experiment_folder=experiment_dir, attack_methods=[ATTACK_TYPE_A, ATTACK_TYPE_B], save_results=True, is_adv_model= args.is_adv_model)
+
+    if args.ensemble:
+        # Currently we have at most 2 models in the ensemble
+        inference_on_src_attacked.main(args.model_wrapper[1].model_name, experiment_folder=experiment_dir,
+                                       attack_methods=[ATTACK_TYPE_A, ATTACK_TYPE_B], save_results=True,
+                                       save_to_file_type='a', is_adv_model=not args.is_adv_model)
+
     if args.plot_pairs:
         create_pair_plots(experiment_dir)
     print("Finished !!!")

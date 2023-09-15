@@ -508,7 +508,7 @@ def attack_physical(attack_db):
         # if ind==2:
         #     break
     explore_total_physical_attack_results(output_report_path)
-    inference_on_src_attacked.main(attack_db, output_dir, attack_methods=[ATTACK_TYPE_A, ATTACK_TYPE_B], save_results=True)
+    inference_on_src_attacked.main(attack_db, output_dir, attack_methods=[ATTACK_TYPE_A, ATTACK_TYPE_B], save_results=True, is_adv_model=True if target_model == "robust" else False)
 
 def attack_physical_untargeted_only(attack_db):
     global position_list
@@ -674,7 +674,7 @@ def attack_physical_untargeted_only(attack_db):
         # if ind==2:
         #     break
     explore_total_physical_attack_results(output_report_path)
-    inference_on_src_attacked.main(attack_db, experiment_dir, attack_methods=[ATTACK_TYPE_A, ATTACK_TYPE_B], save_results=True)   # TODO: remove this comment atfer fixing atatck to attack['normal_atatck', 'special_atatck']
+    inference_on_src_attacked.main(attack_db, experiment_dir, attack_methods=[ATTACK_TYPE_A, ATTACK_TYPE_B], save_results=True, is_adv_model=True if target_model == "robust" else False)   # TODO: remove this comment atfer fixing atatck to attack['normal_atatck', 'special_atatck']
 
 def check_and_save_final_attacked_image(adv_img, attack_db, image_label, output_dir):
     cv2.imwrite(f'./{output_dir}/adv_img.png', adv_img)

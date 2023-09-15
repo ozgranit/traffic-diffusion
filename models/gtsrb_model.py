@@ -1,4 +1,4 @@
-from typing import Union, Tuple
+from typing import Tuple
 import cv2
 import torch
 import torch.nn as nn
@@ -6,14 +6,16 @@ import numpy as np
 from torchvision import transforms
 from attacks.ShadowAttack.shadow_attack_settings import MODEL_PATH
 from models.base_model import BaseModel
-from settings import GTSRB
+from settings import GTSRB, DEVICE
+import torch.nn.functional as F
 
 
 class GtsrbCNN(nn.Module):
 
-    def __init__(self, n_class):
+    def __init__(self, n_class, interpolate_size: int = None):
 
         super().__init__()
+        self.interpolate_size = interpolate_size
         self.color_map = nn.Conv2d(3, 3, (1, 1), stride=(1, 1), padding=0)
         self.module1 = nn.Sequential(
             nn.Conv2d(3, 32, (5, 5), stride=(1, 1), padding=2),
@@ -53,6 +55,10 @@ class GtsrbCNN(nn.Module):
 
     def forward(self, x):
 
+        if self.interpolate_size is not None:
+            # Resize the input tensor using interpolate to the specified size
+            x = F.interpolate(x, size=self.interpolate_size, mode='bilinear', align_corners=False)
+
         x = self.color_map(x)
         branch1 = self.module1(x)
         branch2 = self.module2(branch1)
@@ -69,10 +75,9 @@ class GtsrbCNN(nn.Module):
         return out
 
 class GtsrbModel(BaseModel):
-    def __init__(self, adv_model: bool=False, crop_size: Tuple[int, int] = (32, 32)):
+    def __init__(self, adv_model: bool=False, crop_size: int = 32, use_interpolate: bool = False):
+        super().__init__(crop_size, use_interpolate)
         self.model_name = GTSRB
-        self.device = 'cuda' if torch.cuda.is_available() else 'cpu'  # params['device']
-        self.crop_size = crop_size
         self.load_params(self.model_name)
         self.model = self.load_model(adv_model)
 
@@ -86,8 +91,9 @@ class GtsrbModel(BaseModel):
         return model
 
     @staticmethod
-    def pre_process_image(img: np.ndarray, crop_size: Tuple[int, int] = (32, 32), device: str = 'cpu') -> torch.tensor:
-        img = cv2.resize(img, crop_size)
+    def pre_process_image(img: np.ndarray, crop_size: Tuple[int, int] = (32, 32), device: str = DEVICE, use_interpolate: bool = False) -> torch.tensor:
+        if not use_interpolate:
+            img = cv2.resize(img, crop_size)
 
         img[:, :, 0] = cv2.equalizeHist(img[:, :, 0])
         img[:, :, 1] = cv2.equalizeHist(img[:, :, 1])
