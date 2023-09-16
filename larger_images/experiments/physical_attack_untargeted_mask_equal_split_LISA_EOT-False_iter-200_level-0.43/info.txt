@@ -1,0 +1,15 @@
+/tmp/pycharm_project_250/larger_images/experiments/physical_attack_untargeted_mask_equal_split_LISA_EOT-False_iter-200_level-0.43/results.csv
+total inputs (different orig images_orig):  25
+total_generated_imgs:  6
+total_test_image_variations:  150
+total_adv_gen_attack_succeeded_normal:  102
+avg_prob_gen_attack_succeeded_normal:  0.39
+acc_normal:  68.00
+count_greater_than_zero_normal (succeeded):  25
+---------------
+total_adv_gen_attack_succeeded_special:  106
+avg_prob_gen_attack_succeeded_special:  0.30
+acc_special:  70.67
+count_greater_than_zero_special (succeeded):  21
+
+Process finished with exit code 0

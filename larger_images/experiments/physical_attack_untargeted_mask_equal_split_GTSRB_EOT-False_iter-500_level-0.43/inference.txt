@@ -1,0 +1,16 @@
+total_images: 175
+total_src_images: 25
+total_diffusion_images: 150
+***
+total_diffusion_imgs_attacked: 11, Acc: 7.333333333333333%
+total_diffusion_images_model_pred_correctly: 139, Acc: 92.66666666666666%
+model_pred_correctly_on_srcAdv_img: 22
+####################################################################################################
+total_images: 175
+total_src_images: 25
+total_diffusion_images: 150
+***
+total_diffusion_imgs_attacked: 9, Acc: 6.0%
+total_diffusion_images_model_pred_correctly: 141, Acc: 94.0%
+model_pred_correctly_on_srcAdv_img: 23
+####################################################################################################

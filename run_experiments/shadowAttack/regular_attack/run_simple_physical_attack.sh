@@ -1,0 +1,16 @@
+python our_shadow_attack.py \
+    --shadow_level 0.43 \
+    --input_data_name None \
+    --attack_model_name "LISA" \
+    --attack_type "physical" \
+    --input_data "attacks/ShadowAttack/tmp/gtsrb_30.png" \
+    --mask_path "attacks/ShadowAttack/tmp/gtsrb_30_mask.png" \
+    --image_label None \
+    --polygon 3 \
+    --n_try 1 \
+    --target_model "normal" \
+    --iter_num 200 \
+    --crop_size 32 \
+    --output_dir "experiments/simple_physical_attack" \
+    --with_EOT \
+    --transform_num 10

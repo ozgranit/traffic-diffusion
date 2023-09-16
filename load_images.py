@@ -9,7 +9,7 @@ import sys
 
 import numpy as np
 
-sys.path.append('ShadowAttack')
+sys.path.append('attacks/ShadowAttack')
 # LISA stop sign label is: 12
 # GTSRB stop sign label is: 14
 
@@ -35,7 +35,8 @@ def load_annotations(xml_path):
     return annotations
 
 
-def process_image(image_folder: str, annotation_folder: str, attack_db: str, crop_size: int = 32, mask_folder: str = None):
+def process_image(image_folder: str, annotation_folder: str, attack_db: str,
+                  crop_size: int = 32, mask_folder: str = None):
     file_names = []
     orig_imgs = []
     cropped_imgs = []
