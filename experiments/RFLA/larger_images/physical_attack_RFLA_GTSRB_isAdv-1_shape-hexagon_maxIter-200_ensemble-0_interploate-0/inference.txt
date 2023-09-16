@@ -1,0 +1,22 @@
+Is adv model: Truemodel_name: GTSRB
+experiment_folder: experiments/RFLA/larger_images/physical_attack_RFLA_GTSRB_isAdv-1_shape-hexagon_maxIter-200_ensemble-0_interploate-0
+is_adv_model: True
+Total_images: 175
+Total_src_images: 25
+Total_diffusion_images: 150
+***
+Total_diffusion_imgs_attacked: 81, Acc: 54.0%
+Total_diffusion_images_model_pred_correctly: 69, Acc: 46.0%
+model_pred_correctly_on_srcAdv_img: 2
+total_diff_imgs_with_at_lease_one_diffusion_image_success: 20
+####################################################################################################
+Is adv model: Trueis_adv_model: True
+Total_images: 175
+Total_src_images: 25
+Total_diffusion_images: 150
+***
+Total_diffusion_imgs_attacked: 133, Acc: 88.66666666666667%
+Total_diffusion_images_model_pred_correctly: 17, Acc: 11.333333333333332%
+model_pred_correctly_on_srcAdv_img: 2
+total_diff_imgs_with_at_lease_one_diffusion_image_success: 24
+####################################################################################################

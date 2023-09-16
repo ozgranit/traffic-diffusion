@@ -1,0 +1,42 @@
+Is adv model: Falsemodel_name: LISA
+experiment_folder: experiments/RFLA/larger_images/physical_attack_RFLA_LISA_isAdv-0_shape-hexagon_maxIter-200_ensemble-1_interploate-0
+is_adv_model: False
+Total_images: 175
+Total_src_images: 25
+Total_diffusion_images: 150
+***
+Total_diffusion_imgs_attacked: 40, Acc: 26.666666666666668%
+Total_diffusion_images_model_pred_correctly: 110, Acc: 73.33333333333333%
+model_pred_correctly_on_srcAdv_img: 15
+total_diff_imgs_with_at_lease_one_diffusion_image_success: 13
+####################################################################################################
+Is adv model: Falseis_adv_model: False
+Total_images: 175
+Total_src_images: 25
+Total_diffusion_images: 150
+***
+Total_diffusion_imgs_attacked: 45, Acc: 30.0%
+Total_diffusion_images_model_pred_correctly: 105, Acc: 70.0%
+model_pred_correctly_on_srcAdv_img: 13
+total_diff_imgs_with_at_lease_one_diffusion_image_success: 13
+####################################################################################################
+Is adv model: Trueis_adv_model: True
+Total_images: 175
+Total_src_images: 25
+Total_diffusion_images: 150
+***
+Total_diffusion_imgs_attacked: 119, Acc: 79.33333333333333%
+Total_diffusion_images_model_pred_correctly: 31, Acc: 20.666666666666668%
+model_pred_correctly_on_srcAdv_img: 2
+total_diff_imgs_with_at_lease_one_diffusion_image_success: 21
+####################################################################################################
+Is adv model: Trueis_adv_model: True
+Total_images: 175
+Total_src_images: 25
+Total_diffusion_images: 150
+***
+Total_diffusion_imgs_attacked: 148, Acc: 98.66666666666667%
+Total_diffusion_images_model_pred_correctly: 2, Acc: 1.3333333333333335%
+model_pred_correctly_on_srcAdv_img: 0
+total_diff_imgs_with_at_lease_one_diffusion_image_success: 25
+####################################################################################################
