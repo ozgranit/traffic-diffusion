@@ -1,2 +1,0 @@
-,total_inputs(diff orig images_orig),total_generated_imgs,total_test_images,total_adv_gen_attack_succeeded_normal,avg_prob_gen_attack_succeeded_normal,acc_normal,count_greater_than_zero_normal,total_adv_gen_attack_succeeded_special,avg_prob_gen_attack_succeeded_special,acc_special,count_greater_than_zero_special
-0,25,6,150,102,0.39,68.00,25,106,0.30,70.67,21

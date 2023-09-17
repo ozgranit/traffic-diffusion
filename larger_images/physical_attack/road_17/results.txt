@@ -1,6 +1,0 @@
-normal atatck:Correct: False
-Predict: 4 Confidence: 67.32544302940369%
-Attack succeed! Try to implement it in the real world.
-special atatck:Correct: False
-Predict: 3 Confidence: 42.99534559249878%
-Attack succeed! Try to implement it in the real world.
