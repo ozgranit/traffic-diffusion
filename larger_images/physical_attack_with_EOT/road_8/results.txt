@@ -1,6 +1,0 @@
-normal atatck:Correct: True
-Predict: 12 Confidence: 92.25584268569946%
-Attack failed! Try to run again.
-special atatck:Correct: True
-Predict: 12 Confidence: 92.32850670814514%
-Attack failed! Try to run again.
