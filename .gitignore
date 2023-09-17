@@ -16,6 +16,7 @@
 /tmp6_a/
 /datasets/kaggle/dataset_images/
 /adv_img
+/larger_images
 __pycache__/
 *.pyc
 
