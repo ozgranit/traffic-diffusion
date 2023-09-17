@@ -1,6 +1,10 @@
 # Traffic-Diffusion
 ### Creating a Robust Real-World Traffic Sign Attack.
 <br>
+
+![alt text](pics/main_pic_from_paper.jpg?raw=true)
+
+<br>
 Our final dataset is located in the following folder:
 `datasets/larger_images`
 
@@ -23,8 +27,10 @@ Our final dataset is located in the following folder:
   <br>You can change inside the file to GTSRB model.
 - You can also run the Shadow attack directly by executing `our_shadow_attack.py` file.  
 
-3. PGD Attack: <br>
+#### 3. PGD Attack: <br>
 - Run PGD attack by running `attacks/our_pgd_attack.py` file
 
 * Attack experiments are saved in `experiments` folder.
+
+
 
