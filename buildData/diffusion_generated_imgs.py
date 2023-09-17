@@ -8,7 +8,7 @@ from PIL.Image import Image
 from settings import GENERATED_IMAGES_TYPES_TRAIN, GENERATED_IMAGES_TYPES_TEST, ATTACK_TYPE_A, ATTACK_TYPE_B
 from img_utils import crop_image
 
-DIFFUSION_IMAGES_PATH = r'larger_images/image_outputs'
+DIFFUSION_IMAGES_PATH = r'datasets/larger_images/image_outputs'
 class DiffusionImages:
     def __init__(self, img_name: str, img_bbx: List[int], size: int, experiment_dir: str):
         # Loading generated images
