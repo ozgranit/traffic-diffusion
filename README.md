@@ -1,6 +1,10 @@
 # Traffic-Diffusion
 ### Creating a Robust Real-World Traffic Sign Attack.
 <br>
+
+![alt text](pics/main_pic_from_paper.jpg?raw=true)
+
+<br>
 Our final dataset is located in the following folder:
 `datasets/larger_images`
 
@@ -27,4 +31,6 @@ Our final dataset is located in the following folder:
 - Run PGD attack by running `attacks/our_pgd_attack.py` file
 
 * Attack experiments are saved in `experiments` folder.
+
+
 
