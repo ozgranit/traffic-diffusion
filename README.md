@@ -14,12 +14,12 @@ Our final dataset is located in the following folder:
 #### 2. Shadow Attack: <br>
 ##### Our physical method: <br>
 - run Lisa attack untargeted: <br>
-`bash run_experiments/shadowAttack/our_attack/run_our_attack_lisa.sh` 
+`bash run_attack_experiments/shadowAttack/our_attack/run_our_attack_lisa.sh` 
 - run Gtsrb attack untargeted: <br>
-`bash run_experiments/shadowAttack/our_attack/run_our_attack_gtsrb.sh` 
+`bash run_attack_experiments/shadowAttack/our_attack/run_our_attack_gtsrb.sh` 
 - ##### paper method only: <br>
     - run Lisa attack: <br>
-    `bash run_experiments/shadowAttack/regular_attack/run_simple_physical_attack.sh`
+    `bash run_attack_experiments/shadowAttack/regular_attack/run_simple_physical_attack.sh`
   <br>You can change inside the file to GTSRB model.
 - You can also run the Shadow attack directly by executing `our_shadow_attack.py` file.  
 
