@@ -5,6 +5,11 @@
 ![alt text](pics/main_pic_from_paper.jpg?raw=true)
 
 <br>
+Please download from <a href="https://github.com/ozgranit/traffic-diffusion/tree/main" target="_blank">our GitHub</a> the following folders:  <br>
+- datasets <br>
+- experiments <br>
+- attacks/ShadowAttack/model <br>
+<br>
 Our final dataset is located in the following folder:
 `datasets/larger_images`
 
