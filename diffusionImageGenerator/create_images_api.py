@@ -25,8 +25,8 @@ TOKENS = ['key-31ffFs5sAm0frJBhYw3Otcw4PpyurGUZBcdzgbZfLS2E1VHb0tscb6MfX9aahh4sr
 URL_BASE = 'https://api.getimg.ai/v1'
 URL_SUFFIX = '/stable-diffusion-xl/image-to-image'
 
-OUTPUT_FOLDER = 'larger_images/image_outputs/'
-INPUT_FOLDER = 'larger_images/image_inputs/'
+OUTPUT_FOLDER = r'datasets/imags_with_shadow/output'    #'larger_images/image_outputs/'
+INPUT_FOLDER = r'datasets/imags_with_shadow/input'  #'larger_images/image_inputs/'
 
 
 def load_images(folder_path, images_filter=None):

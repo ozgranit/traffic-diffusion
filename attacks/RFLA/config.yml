@@ -2,7 +2,7 @@ sys_flag: "win"
 max_iter: 200
 model_name: "LISA"
 dataset_name: "larger_images"
-output_dir: "experiments/RFLA"
+output_dir: "experiments/RFLA_tmp"
 attack_label: None
 is_adv_model: False
 plot_pairs: True
