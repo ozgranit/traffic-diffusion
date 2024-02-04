@@ -1,9 +1,14 @@
 import argparse
+import copy
+import json
+import pickle
 from typing import List, Tuple
 
+import numpy as np
 import yaml
 import time
 import utils_rfla
+from attacks.RFLA.attack_params import AttackParams
 from buildData.diffusion_generated_imgs import DiffusionImages
 from buildData.input_data import InputData
 from datasets.larger_images.larger_images_settings import LARGER_IMAGES
@@ -150,8 +155,9 @@ class PSOAttack(object):
                 raise ValueError("Please select the shape in [line, triangle, rectangle, pentagon, hexagon]")
         return pops
 
-    def gen_adv_images_by_pops(self, image: np.ndarray, pops: List[Tuple]) -> np.ndarray:
+    def gen_adv_images_by_pops(self, image: np.ndarray, pops: List[Tuple]) -> Tuple[np.ndarray, List[AttackParams]]:
         result_images = []
+        result_attacks_params = []
         for j, pop in enumerate(pops):
             image_raw = copy.deepcopy(image)
             x, y, r, alpha, red, green, blue = pop[:7]
@@ -219,7 +225,10 @@ class PSOAttack(object):
                 image_new = cv2.addWeighted(image_raw, alpha, image, 1 - alpha, 0)
             # Image.fromarray(image_new).save("optimizing_images/image_{j}.png")
             result_images.append(image_new)
-        return np.array(result_images)
+            attack_params = AttackParams([points], red, green, blue, alpha, 1-alpha, 0)
+            result_attacks_params.append(attack_params)
+
+        return np.array(result_images), result_attacks_params
 
     def to_tensor(self, images):
         try:
@@ -254,9 +263,9 @@ class PSOAttack(object):
                         continue
                     self.v[i][j][k] = random.uniform(self.v_bound[0][k], self.v_bound[1][k])
 
-            adv_images = self.gen_adv_images_by_pops(image_raw, pops)
+            adv_images, adv_params = self.gen_adv_images_by_pops(image_raw, pops)
             if diffusion_imgs is not None:
-                adv_images = self.gen_adv_to_multiple_imgs(adv_images, pops, diffusion_imgs)
+                adv_images, adv_params = self.gen_adv_to_multiple_imgs(adv_images, adv_params, pops, diffusion_imgs)
 
             softmax = self.calculate_fitness(adv_images)
             fitness_score, pred_labels = torch.max(softmax, dim=1)
@@ -451,16 +460,19 @@ class PSOAttack(object):
     #     ##############33
     #     return g_fitness_sum, best_min_fitness_score_ind, best_min_fitness_score
 
-    def gen_adv_to_multiple_imgs(self, adv_images: np.ndarray, pops: List[Tuple], diffusion_imgs: DiffusionImages):
+    def gen_adv_to_multiple_imgs(self, adv_images: np.ndarray, adv_params: List[AttackParams], pops: List[Tuple], diffusion_imgs: DiffusionImages):
 
         all_diffusion_adv_images_list = [adv_images]
+        all_diffusion_adv_params_list = [adv_params]
         for diffusion_img, diffusion_img_name in diffusion_imgs.diffusion_images_for_attack():
-            diffusion_adv_images = self.gen_adv_images_by_pops(diffusion_img, pops)
+            diffusion_adv_images, diffusion_adv_params = self.gen_adv_images_by_pops(diffusion_img, pops)
             all_diffusion_adv_images_list.append(diffusion_adv_images)
+            all_diffusion_adv_params_list.append(diffusion_adv_params)
         # adv_images = [img_ for list_ in all_diffusion_adv_images_list for img_ in list_]
         adv_images = np.stack([img_ for list_ in all_diffusion_adv_images_list for img_ in list_], 0)
+        adv_params = np.stack([item_ for list_ in all_diffusion_adv_params_list for item_ in list_], 0)
 
-        return adv_images
+        return adv_images, adv_params
 
     @torch.no_grad()
     def calculate_fitness(self, images: np.ndarray) -> torch.Tensor:
@@ -560,9 +572,9 @@ class PSOAttack(object):
                 for k in range(self.dimension):
                     self.pops[i][j][k] = min(max(self.pops[i][j][k], self.pop_bound[0][k]), self.pop_bound[1][k])
             ################# Finished!! #################
-            current_adv_images = self.gen_adv_images_by_pops(image_raw, self.pops[i])
+            current_adv_images, current_adv_params = self.gen_adv_images_by_pops(image_raw, self.pops[i])
             if diffusion_imgs is not None:
-                current_adv_images = self.gen_adv_to_multiple_imgs(current_adv_images, self.pops[i], diffusion_imgs)
+                current_adv_images, current_adv_params = self.gen_adv_to_multiple_imgs(current_adv_images, current_adv_params, self.pops[i], diffusion_imgs)
 
             softmax = self.calculate_fitness(current_adv_images)
             fitness_score, pred_labels = torch.max(softmax, dim=1)
@@ -758,7 +770,7 @@ class PSOAttack(object):
         best_pop = self.best_pop_on_src_and_diffusoin
         if best_pop is None:
             best_pop = None #TODO: set best pop
-        adv_img = self.gen_adv_images_by_pops(image, [best_pop])
+        adv_img, adv_params = self.gen_adv_images_by_pops(image, [best_pop])
         if attack_with_diffusion and not diffusion_imgs:
             raise Exception("attack_with_diffusion is True but diffusion_imgs is None ")
 
@@ -773,12 +785,18 @@ class PSOAttack(object):
             print("output_dir: ", output_dir)
             os.makedirs(output_dir, exist_ok=True)
             Image.fromarray(image2saved_).save(f'{output_dir}/{filename}.png')
-            Image.fromarray(image2saved_).save(f'{output_dir}/{filename}.png')
 
             for diffusion_img, diffusion_img_name in diffusion_imgs.diffusion_images_for_test():
-                adv_img = self.gen_adv_images_by_pops(diffusion_img, [best_pop])
+                adv_img, adv_params = self.gen_adv_images_by_pops(diffusion_img, [best_pop])
                 image2saved_ = cv2.cvtColor(adv_img[0], cv2.COLOR_BGR2RGB)  # TODO: check is really needed
                 Image.fromarray(image2saved_).save(fr'{output_dir}/{diffusion_img_name}.png')
+                adv_params_pickle_file_path = fr'{output_dir}/{diffusion_img_name}.pkl'
+                with open(adv_params_pickle_file_path, 'wb') as file:
+                    pickle.dump(adv_params[0], file)
+                image_attack_mask_path =fr'{output_dir}/{diffusion_img_name}_mask.png'
+                mask_attack = np.ones_like(diffusion_img) * 255
+                cv2.fillPoly(mask_attack, adv_params[0].points, (0, 0, 0))
+                cv2.imwrite(image_attack_mask_path, mask_attack)
 
 def set_bounds(args: argparse.ArgumentParser) -> List[float]:
     if "line" in args.shape_type:
