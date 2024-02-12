@@ -28,7 +28,7 @@ URL_BASE = 'https://api.getimg.ai/v1'
 URL_SUFFIX = '/stable-diffusion-xl/image-to-image'
 
 INPUT_FOLDER = r'/workspace/traffic-diffusion/datasets/imags_with_shadow/input_large_src_with_shadow' #'api_input/'
-OUTPUT_FOLDER = r'/workspace/traffic-diffusion/datasets/imags_with_shadow/output_api_tmp'   #'api_output/'
+OUTPUT_FOLDER = r'/workspace/traffic-diffusion/datasets/imags_with_shadow/output_locally_tmp_'   #'api_output/'
 
 
 def load_images(folder_path, images_filter=None):
@@ -60,6 +60,7 @@ def stable_diffusion_xl(model, image, prompt, negative_prompt, strength, steps,
     # image = cv2.imdecode(image_array, cv2.IMREAD_COLOR)
 
     # Run the model inference
+    # TODO: insert attack to orig large image, and send that to stable diffusion. then crop it again
     result_image = model(prompt=prompt, image=image, negative_prompt=negative_prompt, strength=strength, num_inference_steps=steps, guidance_scale=guidance)
 
     return result_image
@@ -136,7 +137,7 @@ def generate_images(original_images):
                 )
                 # response = requests.post(url, json=data, headers=headers)
                 if result_image is not None:
-                    cur_output_folder = OUTPUT_FOLDER + filename
+                    cur_output_folder = os.path.join(OUTPUT_FOLDER, filename)
                     os.makedirs(cur_output_folder, exist_ok=True)
                     cur_output_folder += '/'
                     output_filename = prompt_desc + '_2.jpg'
@@ -152,9 +153,10 @@ def generate_images(original_images):
                     # # convert the image bytes to a np array and decode into an OpenCV image
                     # image_array = np.frombuffer(image_bytes, np.uint8)
                     # cv_image = cv2.imdecode(image_array, cv2.IMREAD_COLOR)
-                    cv_image = result_image
+                    cv_image = result_image.images[0]
                     received_images.append(cv_image)
-                    cv2.imwrite(cur_output_folder + output_filename, cv_image)
+                    cv_image.save(os.path.join(cur_output_folder, output_filename))
+                    # cv2.imwrite(os.path.join(cur_output_folder, output_filename), cv_image)
 
                     # cv2.imshow(filename, cv_image)
                     # cv2.waitKey(0)
