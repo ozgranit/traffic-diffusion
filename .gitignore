@@ -21,3 +21,9 @@ __pycache__/
 *.pyc
 
 attacks/RFLA/test_images/0c7ac4a8c9dfa802.png
+
+datasets/imags_with_shadow/
+experiments/RFLA_tmp/
+experiments/RFLA_thesis_diffusion_debug/
+.tmp.driveupload/
+.tmp.drivedownload/
