@@ -16,7 +16,16 @@ class Results:
         self.total_diff_imgs_with_at_lease_one_diffusion_image_success = 0
     def get_results(self) -> str:
         # Create the result string
-        result = (
+        if self.total_diffusion_images == 0:
+            result = (
+                f"is_adv_model: {self.is_adv_model}\n"
+                f"Total_images: {self.total_images}\n"
+                f"Total_src_images: {self.total_src_images}\n"
+                f"Total_diffusion_images: {self.total_diffusion_images}\n"
+                f"model_pred_correctly_on_srcAdv_img: {self.model_pred_correctly_on_srcAdv_img}\n"
+            )
+        else:
+            result = (
                 f"is_adv_model: {self.is_adv_model}\n"
                 f"Total_images: {self.total_images}\n"
                 f"Total_src_images: {self.total_src_images}\n"

@@ -20,7 +20,7 @@ def inference_folder_with_attacked_images(model_name: str, experiment_folder: st
     results = Results(model_name, experiment_folder, is_adv_model)
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     for file_name in os.listdir(experiment_folder):
-        if file_name.endswith("png"):
+        if file_name.endswith("png") and not file_name.endswith("_mask.png"):
             pred_label = inference_helper(device, experiment_folder, file_name, model_wrapper.model, model_wrapper.pre_process_image, crop_size=crop_size) # TODO: remove this
             image_path = os.path.join(experiment_folder, file_name)
             confidence, pred_label, model_failed, msg = model_wrapper.test_single_image(image_path, true_label,
@@ -56,7 +56,7 @@ def inference_folder_with_sub_attack_folders_with_attacked_images(model_name: st
             if os.path.isdir(file_dir):
                 images_folder = os.path.join(file_dir, attack_type)
                 for file_name in os.listdir(images_folder):
-                    if file_name.endswith("png"):
+                    if file_name.endswith("png") and not file_name.endswith("_mask.png"):
                         results.total_images += 1
                         # pred_label_ = inference_helper(device, images_folder, file_name, model_wrapper.model, model_wrapper.pre_process_image)  #TODO: remove this line
                         image_path = os.path.join(images_folder, file_name)
