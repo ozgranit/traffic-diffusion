@@ -890,7 +890,7 @@ class PSOAttack(object):
             all_diffusion_adv_images_info = {-1:{"src_adv": {"i":-1, "cropped_resize_img": adv_images[0], "large_adv_image": adv_images_large}}}  #[adv_images]
         all_diffusion_adv_images_list = [adv_img for adv_img in adv_images]  #[adv_images]
         adv_images_large_pil = self.numpy_to_pil_img_for_diffusion_model(adv_images_large)
-        print(f"adv_images_large_pil: {len(adv_images_large_pil)}")
+        # print(f"adv_images_large_pil: {len(adv_images_large_pil)}")
         ind = 15
         cnt = 0
         for prompt_desc, cur_prompt in prompt_getter.items():
@@ -906,6 +906,8 @@ class PSOAttack(object):
                     result_image = result_image.images[0]
                     result_image_resized_cropped = self.process_image_after_diffusion_generation(result_image, bbx, adv_images.shape[1:3])
                     if adv_images.shape[0] == 1:
+                        if cnt not in all_diffusion_adv_images_info:
+                            all_diffusion_adv_images_info[cnt] = {}
                         all_diffusion_adv_images_info[cnt][prompt_desc] = {"cnt": cnt, "cropped_resize_img": result_image_resized_cropped, "large_adv_image": result_image}
 
                     # if ind + i not in all_diffusion_adv_images_info:
