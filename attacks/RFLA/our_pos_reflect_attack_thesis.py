@@ -311,16 +311,16 @@ class PSOAttack(object):
                     for pop_ind in success_indicator_index:
                          # TODO: set 30 again
                         # succeeded_pops[pop_ind % 30] += 1
-                        succeeded_pops[pop_ind % 15] += 1
+                        succeeded_pops[pop_ind % len(pops)] += 1
 
                     if succeeded_pops.max() > self.best_pop_on_src_and_diffusoin_count_imgs_success:
                         self.update_iteration_params(fitness_score, i, pops, succeeded_pops,
                                                      success_indicator_index)
                         self.update_best_pop_attack(i, succeeded_pops, adv_large_images_by_prompt_desc)
                         print(
-                            f"Initialize Success on {filename}, i-{i}:  {self.best_pop_on_src_and_diffusoin_count_imgs_success}, g_fitness: {self.g_best_fitness}, p_fitness: {self.p_best_fitness[i]}, prediction: {pred_labels[success_indicator.cpu().data.numpy()][0]}, probability: {fitness_score[success_indicator.cpu().data.numpy()][0]}")
+                            f"Initialize Success on {filename} on {succeeded_pops.max()} imgs, i-{i}:  {self.best_pop_on_src_and_diffusoin_count_imgs_success}, g_fitness: {self.g_best_fitness}, p_fitness: {self.p_best_fitness[i]}, prediction: {pred_labels[success_indicator.cpu().data.numpy()][0]}, probability: {fitness_score[success_indicator.cpu().data.numpy()][0]}")
 
-                    if succeeded_pops.max() == len(diffusion_imgs.generated_imgs_train_cropped_names) / 2:
+                    if succeeded_pops.max() == (len(diffusion_imgs.generated_imgs_train_cropped_names) / 2) + 1:
                         self.update_iteration_params(fitness_score, i, self.pops[i], succeeded_pops,
                                                      success_indicator_index)
                         self.update_best_pop_attack(i, succeeded_pops, adv_large_images_by_prompt_desc)
@@ -627,21 +627,21 @@ class PSOAttack(object):
                     for pop_ind in success_indicator_index:
                         # TODO: set 30 again
                         # succeeded_pops[pop_ind % 30] += 1
-                        succeeded_pops[pop_ind % 15] += 1
+                        succeeded_pops[pop_ind % len(self.pops)] += 1
                     if succeeded_pops.max() > self.best_pop_on_src_and_diffusoin_count_imgs_success:
                         self.update_iteration_params(fitness_score, i, self.pops[i], succeeded_pops,
                                                      success_indicator_index)
                         self.update_best_pop_attack(i, succeeded_pops, current_adv_large_images_by_prompt_desc)
-                        print(f"【{itr}/{self.max_iter}】Success: g_fitness: {self.g_best_fitness}, p_fitness: {self.p_best_fitness[i]}, prediction: {pred_labels[success_indicator.cpu().data.numpy()][0]}, probability: {fitness_score[success_indicator.cpu().data.numpy()][0]}")
+                        print(f"【{itr}/{self.max_iter}】Success on {succeeded_pops.max()} imgs: g_fitness: {self.g_best_fitness}, p_fitness: {self.p_best_fitness[i]}, prediction: {pred_labels[success_indicator.cpu().data.numpy()][0]}, probability: {fitness_score[success_indicator.cpu().data.numpy()][0]}")
 
                     # if succeeded_pops.max() == (len(diffusion_imgs.generated_imgs_train_cropped_names) + 1):
-                    if succeeded_pops.max() == len(diffusion_imgs.generated_imgs_train_cropped_names) / 2:
+                    if succeeded_pops.max() == (len(diffusion_imgs.generated_imgs_train_cropped_names) / 2) + 1:
                         self.update_iteration_params(fitness_score, i, self.pops[i], succeeded_pops,
                                                      success_indicator_index)
                         self.update_best_pop_attack(i, succeeded_pops, current_adv_large_images_by_prompt_desc)
 
                         # TODO: apply attack to test generated images...
-                        print(f"{filename}: 【{itr}/{self.max_iter}】 i-{i} Success: g_fitness: {self.g_best_fitness}, p_fitness: {self.p_best_fitness[i]}, prediction: {pred_labels[success_indicator.cpu().data.numpy()][0]}, probability: {fitness_score[success_indicator.cpu().data.numpy()][0]}")
+                        print(f"{filename}: 【{itr}/{self.max_iter}】 i-{i} Success all: g_fitness: {self.g_best_fitness}, p_fitness: {self.p_best_fitness[i]}, prediction: {pred_labels[success_indicator.cpu().data.numpy()][0]}, probability: {fitness_score[success_indicator.cpu().data.numpy()][0]}")
                         return True
                     # elif succeeded_pops.max() == self.best_pop_on_src_and_diffusoin_count_imgs_success:
                     #     g_fitness, p_best_idx, g_fitness_real = self.compute_best_pop_params_with_diffusion_imgs_in_equal_state(
@@ -844,25 +844,28 @@ class PSOAttack(object):
                                                                                                                train=False)
                 for ind, diffusion_adv_data in diffusion_adv_large_images_by_prompt_desc.items():
                     for prompt_desc in diffusion_adv_data.keys():
-                        large_adv_img = diffusion_adv_data[prompt_desc]["large_adv_image"]
-                        cropped_resize_img = diffusion_adv_data[prompt_desc]["cropped_resize_img"]
+                        if prompt_desc in diffusion_adv_data:
+                            large_adv_img = diffusion_adv_data[prompt_desc]["large_adv_image"]
+                            cropped_resize_img = diffusion_adv_data[prompt_desc]["cropped_resize_img"]
 
-                        # adv_img, adv_params = self.gen_adv_images_by_pops(diffusion_img, [best_pop])
-                        image2saved_ = cv2.cvtColor(cropped_resize_img, cv2.COLOR_BGR2RGB)  # TODO: check is really needed
-                        Image.fromarray(image2saved_).save(fr'{output_dir}/{prompt_desc}.png')
+                            # adv_img, adv_params = self.gen_adv_images_by_pops(diffusion_img, [best_pop])
+                            image2saved_ = cv2.cvtColor(cropped_resize_img, cv2.COLOR_BGR2RGB)  # TODO: check is really needed
+                            Image.fromarray(image2saved_).save(fr'{output_dir}/{prompt_desc}.png')
 
-                        # Saving large adv image
-                        # adv_img, adv_params = self.gen_adv_images_by_pops(diffusion_img, [best_pop])
-                        image2saved_ = cv2.cvtColor(np.array(large_adv_img), cv2.COLOR_BGR2RGB)  # TODO: check is really needed
-                        Image.fromarray(image2saved_).save(fr'{output_dir_large}/{prompt_desc}.png')
+                            # Saving large adv image
+                            # adv_img, adv_params = self.gen_adv_images_by_pops(diffusion_img, [best_pop])
+                            image2saved_ = cv2.cvtColor(np.array(large_adv_img), cv2.COLOR_BGR2RGB)  # TODO: check is really needed
+                            Image.fromarray(image2saved_).save(fr'{output_dir_large}/{prompt_desc}.png')
 
-                        adv_params_pickle_file_path = fr'{output_dir}/{prompt_desc}.pkl'
-                        with open(adv_params_pickle_file_path, 'wb') as file:
-                            pickle.dump(adv_params[0], file)
-                        image_attack_mask_path =fr'{output_dir}/{prompt_desc}_mask.png'
-                        mask_attack = np.ones_like(image) * 255
-                        cv2.fillPoly(mask_attack, adv_params[0].points, (0, 0, 0))
-                        cv2.imwrite(image_attack_mask_path, mask_attack)
+                            adv_params_pickle_file_path = fr'{output_dir}/{prompt_desc}.pkl'
+                            with open(adv_params_pickle_file_path, 'wb') as file:
+                                pickle.dump(adv_params[0], file)
+                            image_attack_mask_path =fr'{output_dir}/{prompt_desc}_mask.png'
+                            mask_attack = np.ones_like(image) * 255
+                            cv2.fillPoly(mask_attack, adv_params[0].points, (0, 0, 0))
+                            cv2.imwrite(image_attack_mask_path, mask_attack)
+                        else:
+                            print(f"Warning: prompt_desc `{prompt_desc}` not in diffusion_adv_data")
 
             # for diffusion_img, diffusion_img_name in diffusion_imgs.diffusion_images_for_test():
             #     adv_img, adv_params = self.gen_adv_images_by_pops(diffusion_img, [best_pop])
@@ -878,16 +881,21 @@ class PSOAttack(object):
 
     @timeit
     def generate_diffusion_images_conatining_attack(self, adv_images, src_orig_image, src_cropped_image, bbx, train: bool = True):
-        all_diffusion_adv_images_info = {}  #[adv_images]
-        all_diffusion_adv_images_list = []  #[adv_images]
         prompt_types = GENERATED_IMAGES_TYPES_TRAIN if train else GENERATED_IMAGES_TYPES_TEST
         adv_images_large = self.insert_cropped_resized_with_attack_into_large_image(adv_images, src_orig_image,
                                                                                    src_cropped_image, bbx)
+        # all_diffusion_adv_images_info = {0:{"src_adv": {"ind+i":0, "cropped_resize_img": adv_images, "large_adv_image": adv_images_large}}}  #[adv_images]
+        all_diffusion_adv_images_info = {}
+        if adv_images.shape[0] == 1:
+            all_diffusion_adv_images_info = {-1:{"src_adv": {"i":-1, "cropped_resize_img": adv_images[0], "large_adv_image": adv_images_large}}}  #[adv_images]
+        all_diffusion_adv_images_list = [adv_img for adv_img in adv_images]  #[adv_images]
         adv_images_large_pil = self.numpy_to_pil_img_for_diffusion_model(adv_images_large)
         print(f"adv_images_large_pil: {len(adv_images_large_pil)}")
-        for i, adv_image_large_pil in enumerate(adv_images_large_pil):
-            for prompt_desc, cur_prompt in prompt_getter.items():
-                if prompt_desc in prompt_types:
+        ind = 15
+        cnt = 0
+        for prompt_desc, cur_prompt in prompt_getter.items():
+            if prompt_desc in prompt_types:
+                for i, adv_image_large_pil in enumerate(adv_images_large_pil):
                     if self.stable_diffusion_model is not None:
                         result_image = self.stable_diffusion_model(prompt=cur_prompt + ". do not change the hexagon shadow in the middle of the stop sign",
                                                                    image=adv_image_large_pil, negative_prompt=NEGATIVE_PROMPT, **self.stable_diffusion_main_params)
@@ -897,11 +905,16 @@ class PSOAttack(object):
 
                     result_image = result_image.images[0]
                     result_image_resized_cropped = self.process_image_after_diffusion_generation(result_image, bbx, adv_images.shape[1:3])
-                    if i not in all_diffusion_adv_images_info:
-                        all_diffusion_adv_images_info[i] = {}
-                    all_diffusion_adv_images_info[i][prompt_desc] = {"i": i, "cropped_resize_img": result_image_resized_cropped, "large_adv_image": result_image}
-                    all_diffusion_adv_images_list.append(result_image_resized_cropped)
+                    if adv_images.shape[0] == 1:
+                        all_diffusion_adv_images_info[cnt][prompt_desc] = {"cnt": cnt, "cropped_resize_img": result_image_resized_cropped, "large_adv_image": result_image}
 
+                    # if ind + i not in all_diffusion_adv_images_info:
+                    #     all_diffusion_adv_images_info[ind + i] = {}
+                    # # all_diffusion_adv_images_info[ind + i][prompt_desc] = {"ind+i": ind+i, "cropped_resize_img": result_image_resized_cropped, "large_adv_image": result_image}
+                    # all_diffusion_adv_images_info = {}
+                    all_diffusion_adv_images_list.append(result_image_resized_cropped)
+                ind += 15
+                cnt += 1
         adv_images = np.stack(all_diffusion_adv_images_list, 0)
         # adv_images = np.stack([img_ for list_ in all_diffusion_adv_images_list for img_ in list_], 0)
 
