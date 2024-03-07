@@ -45,6 +45,7 @@ def process_image(image_folder: str, annotation_folder: str, attack_db: str,
     bbx = []
     cropped_resized_masks = []
 
+    counter = 0
     #for xml_file in os.listdir(annotation_folder):
     for xml_file in sorted(os.listdir(annotation_folder), key=lambda name: int(name.split('_')[1].split('.')[0])):  #os.listdir(annotation_folder):
         if xml_file.endswith('.xml'):
@@ -81,6 +82,12 @@ def process_image(image_folder: str, annotation_folder: str, attack_db: str,
                         cropped_resized_imgs.append(cropped_resized)
                         labels.append(label_value)
                         bbx.append([xmin, ymin, xmax, ymax])
+
+        counter += 1
+        # # TODO: remove this
+        # print("Attention!!!: Remove break")
+        # if counter == 2:
+        #     break
 
     if mask_folder is not None:
         return file_names, orig_imgs, cropped_imgs, cropped_resized_imgs, labels, bbx, cropped_resized_masks

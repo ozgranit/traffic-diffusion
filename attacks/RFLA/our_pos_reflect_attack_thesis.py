@@ -2,16 +2,33 @@ import argparse
 import base64
 import copy
 import json
+import os
 import pickle
 from typing import List, Tuple, Dict
-
+import torch
 import PIL
-import diffusers
-import numpy as np
 import yaml
 import time
-import utils_rfla
+import sys
+import numpy as np
+import cv2
+# Add a directory to the Python import search path
+# sys.path.append('/home/sharifm/students/ortallevi/trafic-diffusion')
+# sys.path.append('/home/sharifm/students/ortallevi/trafic-diffusion/')
+# sys.path.append('trafic-diffusion/')
+
+# sys.path.append('attacks/')
+# sys.path.append('attacks')
+# sys.path.append('attacks/RFLA')
+# print(os.curdir)
+# print(os.listdir(os.curdir))
+# sys.path.append('.')
+# sys.path.append('/home/sharifm/students/ortallevi/trafic-diffusion/attacks')
+# os.chdir('/home/sharifm/students/ortallevi/trafic-diffusion')
+# os.chdir('trafic-diffusion')
+
 from attacks.RFLA.attack_params import AttackParams
+# from attack_params import AttackParams
 from buildData.diffusion_generated_imgs import DiffusionImages
 from buildData.input_data import InputData
 from datasets.larger_images.larger_images_settings import LARGER_IMAGES
@@ -29,19 +46,21 @@ from plot_images import create_pair_plots
 from prompts import prompt_getter, NEGATIVE_PROMPT
 from settings import ATTACK_TYPE_A, ATTACK_TYPE_B, LISA, GTSRB, STOP_SIGN_LISA_LABEL, STOP_SIGN_GTSRB_LABEL, DEVICE, \
     GENERATED_IMAGES_TYPES_TRAIN, GENERATED_IMAGES_TYPES_TEST
-from utils_rfla import *
+import attacks.RFLA.utils_rfla as utils_rfla
 import random
 import requests
 
 # Set seed
+# Set seed for PyTorch
+# Check if CUDA is available and set seed for CUDA
 seed = 42
 random.seed(seed)
 torch.manual_seed(seed)
 if torch.cuda.is_available():
     torch.cuda.manual_seed(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False  # Set this to False for fully deterministic results
 np.random.seed(seed)
-torch.backends.cudnn.deterministic = True
-torch.backends.cudnn.benchmark = False  # Set this to False for fully deterministic results
 torch.use_deterministic_algorithms(True)
 
 # Set CUBLAS_WORKSPACE_CONFIG environment variable based on CUDA version
@@ -70,7 +89,9 @@ class PSOAttack(object):
                  size=50,
                  sub_size=50,
                  shape_type='tri',
-                 save_dir='saved_images'
+                 save_dir='saved_images',
+                 logs_dir='logs',
+                 device = DEVICE
                  ):
         self.dimension = dimension  # the dimension of the base variable
         self.max_iter = max_iter  # maximum iterative number
@@ -86,12 +107,14 @@ class PSOAttack(object):
         self.c_list = c_list  # learning factor
         self.mask = mask    # binary mask. ImageNet: all one matrix
         self.image_size = image_size  # image size
-        self.shape_type = shape_type  # type of geometry shape 
+        self.shape_type = shape_type  # type of geometry shape
+        self.device = DEVICE
         self.models_wrapper = model_wrapper  # the model
         # self.model_name = model_name
         self.transform = transform  # transformation for input of the model
         # self.pre_process = pre_process
         self.save_dir = save_dir
+        self.logs_dir = logs_dir
         self.best_pop_on_src_and_diffusoin = None
         if shape_type in ['line']:
             self.dimension += 0
@@ -194,7 +217,7 @@ class PSOAttack(object):
                 angle_beta = angles[1]
                 x_1, y_1 = utils_rfla.get_point_by_angle((x, y), r,
                                                          angle_beta)
-                x_11, y_11 = get_symmetric_point_of_center((x, y), (x_0, y_0))
+                x_11, y_11 = utils_rfla.get_symmetric_point_of_center((x, y), (x_0, y_0))
                 points = np.array([(x_0, y_0), (x_1, y_1), (x_11, y_11)]).astype(np.int32)
                 cv2.fillPoly(image_raw, [points], (red, green, blue))
                 image_new = cv2.addWeighted(image_raw, alpha, image, 1 - alpha, 0)
@@ -202,8 +225,8 @@ class PSOAttack(object):
             elif self.shape_type in "rectangle":
                 angle_beta = angles[1]
                 x_1, y_1 = utils_rfla.get_point_by_angle((x, y), r, angle_beta)
-                x_11, y_11 = get_symmetric_point_of_center((x, y), (x_0, y_0))
-                x_21, y_21 = get_symmetric_point_of_center((x, y), (x_1, y_1))
+                x_11, y_11 = utils_rfla.get_symmetric_point_of_center((x, y), (x_0, y_0))
+                x_21, y_21 = utils_rfla.get_symmetric_point_of_center((x, y), (x_1, y_1))
                 points = np.array([(x_0, y_0), (x_1, y_1), (x_11, y_11), (x_21, y_21)]).astype(np.int32)
                 points = utils_rfla.sort_points_by_distance(points)
                 cv2.fillPoly(image_raw, [points], (red, green, blue))
@@ -292,7 +315,7 @@ class PSOAttack(object):
                 # TODO: generate images with the attack.
 
                 adv_images, adv_large_images_by_prompt_desc = self.generate_diffusion_images_conatining_attack(adv_images, orig_image_raw,
-                                                                              cropped_image_raw, bbx, train=True)
+                                                                              cropped_image_raw, bbx, filename=filename, train=True, iter=i, initialize=True)
                 # adv_images, adv_params = self.gen_adv_to_multiple_imgs(adv_images, adv_params, pops, diffusion_imgs)
 
             softmax = self.calculate_fitness(adv_images)
@@ -516,9 +539,9 @@ class PSOAttack(object):
             resized_images = torch.stack(resized_images, dim=0)
             if len(resized_images.shape) == 5:
                 resized_images = resized_images.squeeze(1)
-            images = resized_images.to(device)
+            images = resized_images.to(self.device)
 
-        images = images.to(device)
+        images = images.to(self.device)
 
         if len(self.models_wrapper) > 1:
             softmax = self.get_ensemble_prediction(images)
@@ -609,7 +632,7 @@ class PSOAttack(object):
             current_adv_images, current_adv_params = self.gen_adv_images_by_pops(image_raw, self.pops[i])
             if diffusion_imgs is not None:
                 current_adv_images, current_adv_large_images_by_prompt_desc = self.generate_diffusion_images_conatining_attack(current_adv_images, orig_image_raw,
-                                                                              cropped_image_raw, bbx, train=True)
+                                                                              cropped_image_raw, bbx, train=True, filename=filename, iter=i, initialize=False)
                 # current_adv_images, current_adv_params = self.gen_adv_to_multiple_imgs(current_adv_images, current_adv_params, self.pops[i], diffusion_imgs)
 
             softmax = self.calculate_fitness(current_adv_images)
@@ -650,8 +673,6 @@ class PSOAttack(object):
                         if succeeded_pops.max() > self.p_best_n_success_imgs[i]:
                             self.update_iteration_params(fitness_score, i, self.pops[i], succeeded_pops,
                                                     success_indicator_index)
-
-
                 else:
                     best_pop = self.pops[i][success_indicator_index[0]]
                     self.best_pop_on_src_and_diffusoin = best_pop
@@ -690,7 +711,7 @@ class PSOAttack(object):
 
                 if self.best_pop_on_src_and_diffusoin_count_imgs_success > 0:
                     print(
-                        f"【{itr}/{self.max_iter}】 i-{i} Success on {filename}: {self.best_pop_on_src_and_diffusoin_count_imgs_success}, g_fitness: {self.g_best_fitness}, g_fitness_real: {self.sg_best_fitness}, p_fitness: {self.p_best_fitness[i]}")
+                        f"【{itr}/{self.max_iter}】 i-{i} Success on {filename} i-{i}: {self.best_pop_on_src_and_diffusoin_count_imgs_success}, g_fitness: {self.g_best_fitness}, g_fitness_real: {self.sg_best_fitness}, p_fitness: {self.p_best_fitness[i]}")
                 else:
                     print(f"{filename}:【{itr}/{self.max_iter}】 i-{i} Failed: g_fitness: {self.g_best_fitness}, g_fitness_real: {self.sg_best_fitness}, p_fitness: {self.p_best_fitness[i]}, prediction: {pred_labels[0]}, probability: {fitness_score[0]}")
 
@@ -808,6 +829,10 @@ class PSOAttack(object):
 
             self.save_adv_images(cropped_resized_img, orig_img, cropped_img, bbx, filename, attack_with_diffusion=attack_with_diffusion, diffusion_imgs=diffusion_imgs)
 
+            # TODO: remove this break
+            if i==1:
+                break
+
         asr = round(100 * (success_cnt / total), 2)
 
         return asr
@@ -841,7 +866,10 @@ class PSOAttack(object):
                                                                                                                orig_image,
                                                                                                                orig_cropped_image,
                                                                                                                bbx,
-                                                                                                               train=False)
+                                                                                                               train=False,
+                                                                                                               filename=filename,
+                                                                                                               iter=-1,
+                                                                                                               initialize=False)
                 for ind, diffusion_adv_data in diffusion_adv_large_images_by_prompt_desc.items():
                     for prompt_desc in diffusion_adv_data.keys():
                         if prompt_desc in diffusion_adv_data:
@@ -880,7 +908,16 @@ class PSOAttack(object):
             #     cv2.imwrite(image_attack_mask_path, mask_attack)
 
     @timeit
-    def generate_diffusion_images_conatining_attack(self, adv_images, src_orig_image, src_cropped_image, bbx, train: bool = True):
+    def generate_diffusion_images_conatining_attack(self, adv_images, src_orig_image, src_cropped_image, bbx,
+                                                    train: bool = True, filename: str = None, iter=None, initialize: bool = True):
+        sub_dir = 'init' if initialize else 'non_init'
+        current_logs_dir = os.path.join(self.logs_dir, filename, sub_dir, str(iter))
+        os.makedirs(current_logs_dir, exist_ok=True)
+
+        for adv_i, adv_img in enumerate(adv_images):
+            adv_img_out_name = f'init-{int(initialize)}_iter-{iter}_adv-{adv_i}.png'
+            cv2.imwrite(os.path.join(current_logs_dir, adv_img_out_name), adv_images[adv_i])
+
         prompt_types = GENERATED_IMAGES_TYPES_TRAIN if train else GENERATED_IMAGES_TYPES_TEST
         adv_images_large = self.insert_cropped_resized_with_attack_into_large_image(adv_images, src_orig_image,
                                                                                    src_cropped_image, bbx)
@@ -897,18 +934,20 @@ class PSOAttack(object):
             if prompt_desc in prompt_types:
                 for i, adv_image_large_pil in enumerate(adv_images_large_pil):
                     if self.stable_diffusion_model is not None:
-                        result_image = self.stable_diffusion_model(prompt=cur_prompt + ". do not change the hexagon shadow in the middle of the stop sign",
-                                                                   image=adv_image_large_pil, negative_prompt=NEGATIVE_PROMPT, **self.stable_diffusion_main_params)
+                        # result_image = self.stable_diffusion_model(prompt=cur_prompt + ". do not change the hexagon shadow in the middle of the stop sign",
+                        model_type, result_image = self.run_stable_diffusion(adv_image_large_pil, cur_prompt)
                     else:
-                        result_image = self.generate_diffusion_image_using_api(prompt_desc=prompt_desc, prompt=cur_prompt + ". do not change the hexagon shadow in the middle of the stop sign",
-                                                                   image=adv_image_large_pil, negative_prompt=NEGATIVE_PROMPT, params=self.stable_diffusion_main_params)
+                        model_type, result_image = self.run_stable_diffusion_using_api(adv_image_large_pil, cur_prompt,
+                                                                                       model_type, prompt_desc,
+                                                                                       result_image)
 
-                    result_image = result_image.images[0]
-                    result_image_resized_cropped = self.process_image_after_diffusion_generation(result_image, bbx, adv_images.shape[1:3])
+                    img_out_name = f'init-{int(initialize)}_{model_type}_iter-{iter}_{prompt_desc}-{i}.png'
+                    result_image_resized_cropped = self.process_image_after_diffusion_generation(copy.deepcopy(result_image), bbx, adv_images.shape[1:3])
+                    cv2.imwrite(os.path.join(current_logs_dir, img_out_name), result_image_resized_cropped)
                     if adv_images.shape[0] == 1:
                         if cnt not in all_diffusion_adv_images_info:
                             all_diffusion_adv_images_info[cnt] = {}
-                        all_diffusion_adv_images_info[cnt][prompt_desc] = {"cnt": cnt, "cropped_resize_img": result_image_resized_cropped, "large_adv_image": result_image}
+                        all_diffusion_adv_images_info[cnt][prompt_desc] = {"cnt": cnt, "cropped_resize_img": result_image_resized_cropped, "large_adv_image": copy.deepcopy(result_image)}
 
                     # if ind + i not in all_diffusion_adv_images_info:
                     #     all_diffusion_adv_images_info[ind + i] = {}
@@ -921,6 +960,26 @@ class PSOAttack(object):
         # adv_images = np.stack([img_ for list_ in all_diffusion_adv_images_list for img_ in list_], 0)
 
         return adv_images, all_diffusion_adv_images_info
+
+    @timeit
+
+    def run_stable_diffusion_using_api(self, adv_image_large_pil, cur_prompt, model_type, prompt_desc, result_image):
+        result_image = self.generate_diffusion_image_using_api(prompt_desc=prompt_desc,
+                                                               prompt=cur_prompt + ". do not change the hexagon shadow in the middle of the stop sign",
+                                                               image=adv_image_large_pil,
+                                                               negative_prompt=NEGATIVE_PROMPT,
+                                                               params=self.stable_diffusion_main_params)
+        model_type = 'api'
+        return model_type, result_image
+
+    @timeit
+    def run_stable_diffusion(self, adv_image_large_pil, cur_prompt):
+        result_image = self.stable_diffusion_model(
+            prompt=cur_prompt + ". do not change the rectangle shadow in the middle of the stop sign",
+            image=adv_image_large_pil, negative_prompt=NEGATIVE_PROMPT, **self.stable_diffusion_main_params)
+        model_type = 'local'
+        result_image = result_image.images[0]
+        return model_type, result_image
 
     def numpy_to_pil_img_for_diffusion_model(self, numpy_images):
         pil_images = []
@@ -984,7 +1043,8 @@ class PSOAttack(object):
 
         while retry_count < max_retries:
             seed = random.randint(1, 2147483647)
-            bearer_token = TOKENS[0]
+            print(seed)
+            bearer_token = TOKENS[5]
 
             # convert the image to base64 encoding
             _, buffer = cv2.imencode('.jpg', np.array(image))
@@ -1012,11 +1072,12 @@ class PSOAttack(object):
 
                 # convert the image bytes to a np array and decode into an OpenCV image
                 image_array = np.frombuffer(image_bytes, np.uint8)
+                cv_image = cv2.imdecode(image_array, cv2.IMREAD_COLOR)
 
                 total_cost += response_json['cost']
                 print('Current cost:', response_json['cost'], 'Total cost:', total_cost)
 
-                return  image_array
+                return  cv_image
             else:
                 retry_count += 1
                 error_json = json.loads(response.text)
@@ -1091,9 +1152,8 @@ def loading_config_file(parser: argparse.ArgumentParser):
 
     return args
 
-
-if __name__ == "__main__":
-
+def main():
+    print("Starting...")
     parser = argparse.ArgumentParser(description="Random Search Parameters")
     ################# the file path of config.yml #################
     parser.add_argument("--yaml_file", type=str, default="attacks/RFLA/config.yml", help="the settings config")
@@ -1117,6 +1177,8 @@ if __name__ == "__main__":
     # Set output dir
     experiment_dir = os.path.join(args.output_dir, input_data.input_name.lower(),
                                   f'physical_attack_RFLA_{args.model_name}_isAdv-{int(args.is_adv_model)}_shape-{args.shape_type}_maxIter-{args.max_iter}_ensemble-{int(args.ensemble)}_interploate-{int(args.use_interpolate)}')
+    log_dir = os.path.join(experiment_dir, 'logs')
+    os.makedirs(log_dir, exist_ok=True)
     if not os.path.exists(experiment_dir):
         os.makedirs(experiment_dir)
 
@@ -1140,18 +1202,26 @@ if __name__ == "__main__":
                     v_lower=v_lower,
                     v_higher=v_higher,
                     shape_type=args.shape_type,
-                    save_dir=experiment_dir
+                    save_dir=experiment_dir,
+                    logs_dir=log_dir,
+                    device=device
                     )
 
     # asr = pso.run_pso(file_names, orig_imgs, cropped_imgs, cropped_resized_imgs, labels, bbx, masks_cropped)
     stable_diffusion_model = load_stable_diffusion_xl() if args.diffusion_model_local else None
-    asr_without_diffusion = pso.run_pso_with_diffusion_imgs(file_names, orig_imgs, cropped_imgs, cropped_resized_imgs, labels, bbx, masks_cropped, attack_with_diffusion=False, stable_diffusion_model=None)
+    asr_without_diffusion = pso.run_pso_with_diffusion_imgs(file_names, orig_imgs, cropped_imgs, cropped_resized_imgs,
+                                                            labels, bbx, masks_cropped, attack_with_diffusion=False,
+                                                            stable_diffusion_model=None)
     print(f"ASR without diffusion of {args.dataset_name}_{args.model_name} is: {asr_without_diffusion}")
 
-    asr_with_diffusion = pso.run_pso_with_diffusion_imgs(file_names, orig_imgs, cropped_imgs, cropped_resized_imgs, labels, bbx, masks_cropped, attack_with_diffusion=True, stable_diffusion_model=stable_diffusion_model)
+    asr_with_diffusion = pso.run_pso_with_diffusion_imgs(file_names, orig_imgs, cropped_imgs, cropped_resized_imgs,
+                                                         labels, bbx, masks_cropped, attack_with_diffusion=True,
+                                                         stable_diffusion_model=stable_diffusion_model)
     print(f"ASR with diffusion of {args.dataset_name}_{args.model_name} is: {asr_with_diffusion}")
 
-    inference_on_src_attacked.main(args.model_wrapper[0].model_name, experiment_folder=experiment_dir, attack_methods=[ATTACK_TYPE_A, ATTACK_TYPE_B], save_results=True, is_adv_model= args.is_adv_model)
+    inference_on_src_attacked.main(args.model_wrapper[0].model_name, experiment_folder=experiment_dir,
+                                   attack_methods=[ATTACK_TYPE_A, ATTACK_TYPE_B], save_results=True,
+                                   is_adv_model=args.is_adv_model)
 
     if args.ensemble:
         # Currently we have at most 2 models in the ensemble
@@ -1162,3 +1232,7 @@ if __name__ == "__main__":
     if args.plot_pairs:
         create_pair_plots(experiment_dir)
     print("Finished !!!")
+
+
+if __name__ == "__main__":
+    main()

@@ -1,19 +1,20 @@
 sys_flag: "win"
-max_iter: 200
+max_iter: 30  #200
 model_name: "LISA"
 dataset_name: "larger_images"
-output_dir: "experiments/RFLA_tmp"
+output_dir: "experiments/RFLA_thesis_diffusion_A100_1"
+diffusion_model_local: True
 attack_label: None
 is_adv_model: False
 plot_pairs: True
-shape_type: "hexagon"
+shape_type: "rectangle"
 image_size: 224
 image_size_feed_to_model: 32
 use_interpolate: False
 ensemble: False
 batch_size : 50
-sub_size : 30
-pop_size : 50
+sub_size : 15 #30
+pop_size : 15 #50
 c1: 1.6  #
 c2: 1.8
 c3: 2.05

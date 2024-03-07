@@ -9,6 +9,9 @@ import requests
 import random
 from prompts import prompt_getter, NEGATIVE_PROMPT
 
+seed = 42
+random.seed(seed)
+
 TOKENS = ['key-1ApfAS0MprJ98FJJaOUYUCeZwHsI5n9tcFJzNRiSm7cQN3CsyRYJ7rvIPtRnHEfCcG6ozNoesB7GW5AeWWuhVQQMMFfp5i0Z',
           'key-38Hgtd7b7rpE47jNGYi3T8JwnSvnSQp58qz2wtEvJtL3W3NAu7iVS5YKwwtg8hJKARjDVBaL0fGixxyV6MrbI2IbvKgIJO4s',
           'key-2qQwGmWcaXRF3ZneDpaTl6CzDrkoqSwicq3k2v94uoQRV9G5KDNa0GafE2BBlMDOsVU1qLXQJOGowWs9kQQjvbUpho4g7SBr',
@@ -24,7 +27,7 @@ URL_BASE = 'https://api.getimg.ai/v1'
 URL_SUFFIX = '/stable-diffusion-xl/image-to-image'
 
 INPUT_FOLDER = r'/workspace/traffic-diffusion/datasets/imags_with_shadow/input_large_src_with_shadow' #'api_input/'
-OUTPUT_FOLDER = r'/workspace/traffic-diffusion/datasets/imags_with_shadow/output_api_'   #'api_output/'
+OUTPUT_FOLDER = r'/workspace/traffic-diffusion/datasets/imags_with_shadow/output_api_2'   #'api_output/'
 
 
 def load_images(folder_path, images_filter=None):
@@ -80,11 +83,16 @@ def generate_images(original_images):
     breaker = False
     received_images = []
     for index, (filename, image) in enumerate(original_images.items()):
+        # if 'attack' not in filename:
+        #     continue
+        if 'api' not in filename:
+            continue
         for prompt_desc, cur_prompt in prompt_getter.items():
             retry_count = 0
             while retry_count < max_retries:
                 seed = random.randint(1, 2147483647)
-                bearer_token = TOKENS[0]
+                print(seed)
+                bearer_token = TOKENS[5]
 
                 # convert the image to base64 encoding
                 _, buffer = cv2.imencode('.jpg', image)
@@ -119,7 +127,9 @@ def generate_images(original_images):
                     image_array = np.frombuffer(image_bytes, np.uint8)
                     cv_image = cv2.imdecode(image_array, cv2.IMREAD_COLOR)
                     received_images.append(cv_image)
-                    cv2.imwrite(cur_output_folder + output_filename, cv_image)
+                    out_img_path = cur_output_folder + output_filename
+                    cv2.imwrite(out_img_path, cv_image)
+                    print(f"out img path: {out_img_path}")
 
                     # cv2.imshow(filename, cv_image)
                     # cv2.waitKey(0)
@@ -129,6 +139,8 @@ def generate_images(original_images):
                     total_cost += response_json['cost']
                     print('Current cost:', response_json['cost'], 'Total cost:', total_cost)
                     break
+                    # TODO: remove this:
+                    breaker = True
                 else:
                     retry_count += 1
                     error_json = json.loads(response.text)
@@ -152,3 +164,15 @@ if __name__ == "__main__":
     images_to_filter = []
     original_images = load_images(INPUT_FOLDER, images_to_filter)
     generate_images(original_images)
+
+
+"""
+headers = {
+    "Authorization": "Bearer Your_Auth_Token",
+    "Content-Type": "application/json"
+}
+headers['Authorization'] = 'Bearer ' + bearer_token
+res=requests.get("https://api.getimg.ai/v1/models?pipeline=image-to-image&family=stable-diffusion-xl", headers=headers)
+res = b'[{"id":"stable-diffusion-xl-v1-0","name":"Stable Diffusion XL","family":"stable-diffusion-xl","pipelines":["text-to-image","image-to-image","inpaint"],"base_resolution":{"width":1024,"height":1024},"price":0.000075,"author_url":"https://stability.ai","license_url":"https://getimg.ai/legal/stable-diffusion-xl-license","created":"2023-08-01T10:59:42.161Z"}]'
+"""
+

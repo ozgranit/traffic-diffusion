@@ -1,0 +1,10 @@
+shapely
+matplotlib
+diffusers~=0.19.3
+Pillow~=9.4.0
+invisible_watermark
+transformers
+accelerate
+safetensors
+torchvision~=0.15.2
+numpy~=1.24.2
