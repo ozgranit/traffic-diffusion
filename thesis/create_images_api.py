@@ -9,19 +9,20 @@ import requests
 import random
 from prompts import prompt_getter, NEGATIVE_PROMPT
 
+from tokens import TOKENS
 seed = 42
 random.seed(seed)
 
-TOKENS = ['key-1ApfAS0MprJ98FJJaOUYUCeZwHsI5n9tcFJzNRiSm7cQN3CsyRYJ7rvIPtRnHEfCcG6ozNoesB7GW5AeWWuhVQQMMFfp5i0Z',
-          'key-38Hgtd7b7rpE47jNGYi3T8JwnSvnSQp58qz2wtEvJtL3W3NAu7iVS5YKwwtg8hJKARjDVBaL0fGixxyV6MrbI2IbvKgIJO4s',
-          'key-2qQwGmWcaXRF3ZneDpaTl6CzDrkoqSwicq3k2v94uoQRV9G5KDNa0GafE2BBlMDOsVU1qLXQJOGowWs9kQQjvbUpho4g7SBr',
-          'key-1Z4hUUXwaT05HQP2hJeYxEcprTFMGDlYp06n2rAqDGhM3aaFDCReUbuq4o582e3GxcIhDcRQx1tyw9JALOoUQE2s344vm6JT',
-          'key-3l9HXVU9Yhk1zNbni3tr8rxEPIcPnDFE5UVWFkfGnKJZpoFWrwl7ryM6ZIIDlhpHXoboRTSfoG80LrEOdbMlxmcw7E8JZduz',
-          'key-2fKUAkv2lHMZ1X4GFW46w8NYLo68oagnVKFXvmRKJFiiIzSKzzDKFM4PxeuxwSP3VzMwxfIlGxl6giBSNN5f7HSwP3lVywYg',
-          'key-4cIQGuaE1dhWK6mB1C8B3ZLh6sWno791RR6xFfnK3pZEZfOyLTefOPnzcJuWWWXQ1HWtTo6u4HqyiLIJpSNvb9gQ5MBtHBNy',
-          'key-aaTpSoBjh6chL4H0Vbh7v3MxlciuRDtNZTvufHEy3LSHAIKxJ3zFnWQoQM0kgkj9kWU6UV8StDuY70fvotyxGQMV9SDXLIU',
-          'key-3X8S5uwKONys5ybITKRFxNxqsca3db4JmneJgTRkr2tCj20NAkOC16HLkk5apkT8EcnFBVJWgM0RW0vEtYilBabI7am7bIWJ',
-          'key-2vbI5KMRKfF0rWcMHLwGo3uMjz2xVx42dehXYVLHY49jueXuWBLledXDZYZomgKlI06v5miEkLrW1n2Jigz936chrbflOBpP']
+# TOKENS = ['key-1ApfAS0MprJ98FJJaOUYUCeZwHsI5n9tcFJzNRiSm7cQN3CsyRYJ7rvIPtRnHEfCcG6ozNoesB7GW5AeWWuhVQQMMFfp5i0Z',
+#           'key-38Hgtd7b7rpE47jNGYi3T8JwnSvnSQp58qz2wtEvJtL3W3NAu7iVS5YKwwtg8hJKARjDVBaL0fGixxyV6MrbI2IbvKgIJO4s',
+#           'key-2qQwGmWcaXRF3ZneDpaTl6CzDrkoqSwicq3k2v94uoQRV9G5KDNa0GafE2BBlMDOsVU1qLXQJOGowWs9kQQjvbUpho4g7SBr',
+#           'key-1Z4hUUXwaT05HQP2hJeYxEcprTFMGDlYp06n2rAqDGhM3aaFDCReUbuq4o582e3GxcIhDcRQx1tyw9JALOoUQE2s344vm6JT',
+#           'key-3l9HXVU9Yhk1zNbni3tr8rxEPIcPnDFE5UVWFkfGnKJZpoFWrwl7ryM6ZIIDlhpHXoboRTSfoG80LrEOdbMlxmcw7E8JZduz',
+#           'key-2fKUAkv2lHMZ1X4GFW46w8NYLo68oagnVKFXvmRKJFiiIzSKzzDKFM4PxeuxwSP3VzMwxfIlGxl6giBSNN5f7HSwP3lVywYg',
+#           'key-4cIQGuaE1dhWK6mB1C8B3ZLh6sWno791RR6xFfnK3pZEZfOyLTefOPnzcJuWWWXQ1HWtTo6u4HqyiLIJpSNvb9gQ5MBtHBNy',
+#           'key-aaTpSoBjh6chL4H0Vbh7v3MxlciuRDtNZTvufHEy3LSHAIKxJ3zFnWQoQM0kgkj9kWU6UV8StDuY70fvotyxGQMV9SDXLIU',
+#           'key-3X8S5uwKONys5ybITKRFxNxqsca3db4JmneJgTRkr2tCj20NAkOC16HLkk5apkT8EcnFBVJWgM0RW0vEtYilBabI7am7bIWJ',
+#           'key-2vbI5KMRKfF0rWcMHLwGo3uMjz2xVx42dehXYVLHY49jueXuWBLledXDZYZomgKlI06v5miEkLrW1n2Jigz936chrbflOBpP']
 
 URL_BASE = 'https://api.getimg.ai/v1'
 URL_SUFFIX = '/stable-diffusion-xl/image-to-image'
