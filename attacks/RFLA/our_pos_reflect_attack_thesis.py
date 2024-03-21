@@ -5,6 +5,8 @@ import json
 import os
 import pickle
 from typing import List, Tuple, Dict
+
+import pandas as pd
 import torch
 import PIL
 import yaml
@@ -12,6 +14,8 @@ import time
 import sys
 import numpy as np
 import cv2
+from PIL import Image, ImageOps
+
 # Add a directory to the Python import search path
 # sys.path.append('/home/sharifm/students/ortallevi/trafic-diffusion')
 # sys.path.append('/home/sharifm/students/ortallevi/trafic-diffusion/')
@@ -28,6 +32,7 @@ import cv2
 # os.chdir('trafic-diffusion')
 
 from attacks.RFLA.attack_params import AttackParams
+from attacks.RFLA.classes.iteration_info import IterationInfo
 # from attack_params import AttackParams
 from buildData.diffusion_generated_imgs import DiffusionImages
 from buildData.input_data import InputData
@@ -49,6 +54,8 @@ from settings import ATTACK_TYPE_A, ATTACK_TYPE_B, LISA, GTSRB, STOP_SIGN_LISA_L
 import attacks.RFLA.utils_rfla as utils_rfla
 import random
 import requests
+
+from thesis.create_images_locally import get_generator, reinitialize_generator
 
 # Set seed
 # Set seed for PyTorch
@@ -91,8 +98,13 @@ class PSOAttack(object):
                  shape_type='tri',
                  save_dir='saved_images',
                  logs_dir='logs',
-                 device = DEVICE
+                 device = DEVICE,
+                 generator_seed=525901257,
+                 generator=None
                  ):
+
+        # self.init_iterations = List[IterationInfo] = []
+        # self.update_iterations = List[IterationInfo] = []
         self.dimension = dimension  # the dimension of the base variable
         self.max_iter = max_iter  # maximum iterative number
         self.size = size  # the size of the particle
@@ -108,7 +120,9 @@ class PSOAttack(object):
         self.mask = mask    # binary mask. ImageNet: all one matrix
         self.image_size = image_size  # image size
         self.shape_type = shape_type  # type of geometry shape
-        self.device = DEVICE
+        self.device = device
+        self.generator_seed = generator_seed
+        self.generator = generator
         self.models_wrapper = model_wrapper  # the model
         # self.model_name = model_name
         self.transform = transform  # transformation for input of the model
@@ -138,6 +152,15 @@ class PSOAttack(object):
         self.best_pop_on_src_and_diffusoin: None  # our added var
         self.best_pop_on_src_and_diffusoin_count_imgs_success = 0  # our added var - on how many images (src_img, and diffusion images - the attack with the pos in 'self.best_pop_on_src_and_diffusoin' has succeeded
         self.best_diffusion_imgs_by_prompt_desc = None
+        self.total_succeeded_in_iteration = [0] * self.size  # our added var - on how many images (src_img, and diffusion images - the attack with the pos in 'self.best_pop_on_src_and_diffusoin' has succeeded
+        self.best_succeeded_pops_mean_scores = [-1] * self.size
+        self.softmax_scores= [[] for i in range(self.size)]
+        self.is_attack_succeeded_for_each_img = [[] for i in range(self.size)]
+
+        self.lowest_softmax_for_attacked_class = np.zeros(self.p_best.shape[0])
+        self.lowest_softmax_for_attacked_class_succeeded = np.zeros(self.p_best.shape[0])
+        self.lowest_softmax_for_attacked_class_index = np.zeros(self.p_best.shape[0])
+        self.is_lowest_softmax_for_attacked_class_in_best_chosen_pop = np.zeros(self.p_best.shape[0])
 
     def set_model(self, model):
         self.model = model
@@ -315,38 +338,54 @@ class PSOAttack(object):
                 # TODO: generate images with the attack.
 
                 adv_images, adv_large_images_by_prompt_desc = self.generate_diffusion_images_conatining_attack(adv_images, orig_image_raw,
-                                                                              cropped_image_raw, bbx, filename=filename, train=True, iter=i, initialize=True)
+                                                                              cropped_image_raw, bbx, filename=filename, train=True, main_itr=-1, iter=i, initialize=True)
                 # adv_images, adv_params = self.gen_adv_to_multiple_imgs(adv_images, adv_params, pops, diffusion_imgs)
 
             softmax = self.calculate_fitness(adv_images)
             fitness_score, pred_labels = torch.max(softmax, dim=1)
-
+            softmax_numpy = copy.deepcopy(softmax).detach().cpu().numpy()
             # Exit when the best solution is obtained
             success_indicator = (pred_labels != label)
+            if diffusion_imgs is not None:
+                self.add_score_and_indication_if_attack_succeeded_to_img_names(softmax_numpy[:, label],
+                                                                  success_indicator, len(pops),
+                                                                  train=True, filename=filename,
+                                                                main_itr=-1, iter=i, initialize=True)
             # success_indicator_ = success_indicator.cpu().data.numpy()
             success_indicator_index = torch.where(success_indicator)[0]
+
+            # self.find_best_result_for_current_iteration(softmax, success_indicator_index)
+            min_index_class, smallest_score_for_class = self.get_smallest_index_and_score_for_attacking_class(softmax_numpy, label)
+            smallest_score_attack_succeeded = pred_labels[min_index_class] != label
+
             success_indicator_index = success_indicator_index.cpu().data.numpy()
             if len(success_indicator_index) >= 1:
+                print(f"pred_labels[min_index_class] != label: {pred_labels[min_index_class] != label}")
                 # if success_indicator.sum().item() >= 1:
                 # adv_images[(pred_labels != label).cpu().data.numpy()]
                 image2saved = adv_images[success_indicator_index]
                 if diffusion_imgs is not None:
                     for pop_ind in success_indicator_index:
-                         # TODO: set 30 again
+                        # TODO: set 30 again
                         # succeeded_pops[pop_ind % 30] += 1
                         succeeded_pops[pop_ind % len(pops)] += 1
 
+                    self.total_succeeded_in_iteration[i] = succeeded_pops.max()
+                    # self.save_best_general_iteration_result(adv_images[min_index_class], adv_params[min_index_class], self.p_best[i],
+                    #                                         min_index_class, smallest_score_for_class,
+                    #                                         smallest_score_attack_succeeded,
+                    #                                         diffusion_imgs, succeeded_pops.max())
                     if succeeded_pops.max() > self.best_pop_on_src_and_diffusoin_count_imgs_success:
-                        self.update_iteration_params(fitness_score, i, pops, succeeded_pops,
-                                                     success_indicator_index)
-                        self.update_best_pop_attack(i, succeeded_pops, adv_large_images_by_prompt_desc)
+                        best_succeeded_pops_ind, best_succeeded_pops_mean_score = self.update_iteration_params(fitness_score, i, pops, succeeded_pops,
+                                                     success_indicator_index, softmax_numpy[:, label])
+                        self.update_best_pop_attack(i, succeeded_pops, best_succeeded_pops_ind, best_succeeded_pops_mean_score, adv_large_images_by_prompt_desc)
                         print(
                             f"Initialize Success on {filename} on {succeeded_pops.max()} imgs, i-{i}:  {self.best_pop_on_src_and_diffusoin_count_imgs_success}, g_fitness: {self.g_best_fitness}, p_fitness: {self.p_best_fitness[i]}, prediction: {pred_labels[success_indicator.cpu().data.numpy()][0]}, probability: {fitness_score[success_indicator.cpu().data.numpy()][0]}")
 
                     if succeeded_pops.max() == (len(diffusion_imgs.generated_imgs_train_cropped_names) / 2) + 1:
-                        self.update_iteration_params(fitness_score, i, self.pops[i], succeeded_pops,
-                                                     success_indicator_index)
-                        self.update_best_pop_attack(i, succeeded_pops, adv_large_images_by_prompt_desc)
+                        best_succeeded_pops_ind, best_succeeded_pops_mean_score = self.update_iteration_params(fitness_score, i, self.pops[i], succeeded_pops,
+                                                     success_indicator_index, softmax_numpy[:, label])
+                        self.update_best_pop_attack(i, succeeded_pops, best_succeeded_pops_ind, best_succeeded_pops_mean_score, adv_large_images_by_prompt_desc)
 
                         # TODO: apply attack to test generated images...
                         print(
@@ -362,7 +401,7 @@ class PSOAttack(object):
                         # self.pops[i, ...] = pops
                         #Ortal
 
-                        self.update_iteration_params(fitness_score, i, pops, succeeded_pops, success_indicator_index)
+                        best_succeeded_pops_ind, best_succeeded_pops_mean_score = self.update_iteration_params(fitness_score, i, pops, succeeded_pops, success_indicator_index, softmax_numpy[:, label])
 
                         # if self.p_best_n_success_imgs[i] > self.best_pop_on_src_and_diffusoin_count_imgs_success:
                         #     # setting number of attacked successfully images (of src + diffusion imgs)
@@ -395,11 +434,17 @@ class PSOAttack(object):
                 else:
                     # self.update_iteration_params(fitness_score, i, pops, succeeded_pops,
                     #                              success_indicator_index)
+                    self.total_succeeded_in_iteration[i] = 1
                     best_pop = self.pops[i][success_indicator_index[0]]
                     self.best_pop_on_src_and_diffusoin = best_pop
                     self.p_best[i] = best_pop
                     self.g_best = self.p_best[i]
                     self.sg_best = self.p_best[i]
+
+                    # self.save_best_general_iteration_result(adv_images[min_index_class], adv_params[min_index_class], self.p_best[i],
+                    #                                         min_index_class, smallest_score_for_class,
+                    #                                         smallest_score_attack_succeeded,
+                    #                                         diffusion_imgs, 1)
 
                     # image2saved_ = cv2.cvtColor(image2saved[0], cv2.COLOR_BGR2RGB) # TODO: check is really needed
                     # Image.fromarray(image2saved_).save(fr'{self.save_dir}/{filename}.png')
@@ -407,6 +452,12 @@ class PSOAttack(object):
                         f"Initialize Success {filename}: g_fitness: {self.g_best_fitness}, g_fitness_real: {self.sg_best_fitness}, p_fitness: {self.p_best_fitness[i]}, prediction: {pred_labels[success_indicator.cpu().data.numpy()][0]}, probability: {fitness_score[success_indicator.cpu().data.numpy()][0]}")
                     return True
             else:
+
+                if diffusion_imgs is not None:
+                    best_succeeded_pops_ind, best_succeeded_pops_mean_score, mask, total_imgs_in_attack = self.update_best_softmax_scores(
+                        fitness_score, i, pops, succeeded_pops, success_indicator_index, softmax_numpy[:, label])
+
+                self.total_succeeded_in_iteration[i] = 0
                 g_fitness = torch.sum(fitness_score).item()
                 p_best_idx = torch.argmin(fitness_score) % len(pops)
                 g_fitness_real = torch.min(fitness_score)
@@ -438,23 +489,109 @@ class PSOAttack(object):
                     # print(
                     #     f"Initialize Failed: g_fitness: {self.g_best_fitness}, g_fitness_real: {self.sg_best_fitness},  p_fitness: {self.p_best_fitness[i]}, prediction: {pred_labels[0]}, probability: {fitness_score[0]}")
 
+                # self.save_best_general_iteration_result(adv_images[min_index_class], adv_params[min_index_class], self.p_best[i], min_index_class, smallest_score_for_class,
+                #                                         smallest_score_attack_succeeded,
+                #                                         diffusion_imgs, 0)
+
         return False
 
-    def update_iteration_params(self, fitness_score, i, pops, succeeded_pops, success_indicator_index):
-        self.p_best_n_success_imgs[i] = succeeded_pops.max()
-        # Calculate mean score for all images with same succeded pop:7
-        # Create a mask for getting score for differenet images with same score,
-        total_imgs_in_attack = int(len(fitness_score) / len(pops))
-        mask = [int(i * len(pops) + succeeded_pops.argmax()) for i in range(total_imgs_in_attack)]
-        # removing successed imgs
+    def find_best_result_for_current_iteration(self, softmax, success_indicator_index, label):
+        if len(success_indicator_index) > 0:
+            # Select softmax scores for label class  corresponding to incorrect predictions
+            class_scores_incorrect = softmax[success_indicator_index.detach().cpu().numpy(), label]
+            # Find the index with the smallest softmax score for label class among incorrect predictions
+            min_index_class_incorrect = np.argmin(class_scores_incorrect)
+
+            # Get the corresponding index from the incorrect prediction indexes
+            min_index_incorrect_predictions = success_indicator_index[min_index_class_incorrect]
+
+            print("Index with smallest softmax score for label class among incorrect predictions:",
+                  min_index_incorrect_predictions)
+        else:
+            # Select softmax scores for label class corresponding to correct predictions (because there ao incorrect predictions)
+            class_scores = softmax[:, label]
+            # Find the index with the smallest softmax score for label class among incorrect predictions
+            min_index_class = np.argmin(class_scores)
+            smallest_score_for_class = softmax[min_index_class][label]
+
+    def get_smallest_index_and_score_for_attacking_class(self, softmax, attack_class_index = 12):
+        # Select softmax scores for label class corresponding to correct predictions (because there ao incorrect predictions)
+        class_scores = softmax[:, attack_class_index]
+        # print(f"class_scores.shape: {class_scores.shape}")
+        # Find the index with the smallest softmax score for label class among incorrect predictions
+        min_index_class = np.argmin(class_scores)
+        smallest_score_for_class = softmax[min_index_class][attack_class_index]
+
+        return min_index_class, smallest_score_for_class
+
+    def update_iteration_params(self, fitness_score, i, pops, succeeded_pops, success_indicator_index, softmax_for_atatcked_label_all):
+        best_succeeded_pops_ind, best_succeeded_pops_mean_score, mask, total_imgs_in_attack = self.update_best_softmax_scores(
+            fitness_score, i, pops, succeeded_pops, success_indicator_index, softmax_for_atatcked_label_all)
+        # removing successful imgs
+        # We take failed examples and therefore their argmax is == attack_class_label -> so the fitness score will have the score the attacked class
         mask = [score_ind for score_ind in mask if score_ind not in success_indicator_index]
         # Use the mask to select values from the tensor
         selected_values = fitness_score[mask]
         # compute score mean of failed attack of selected pos (the mean is evaluateing considering score for success attack as 0, therefore we divide by total_imgs_in_attack
         self.p_best_fitness[i] = torch.sum(selected_values).item() / total_imgs_in_attack
         # setting best pop
-        best_pop = pops[succeeded_pops.argmax()]
+        best_pop = pops[best_succeeded_pops_ind]
+        # best_pop = pops[succeeded_pops.argmax()]
         self.p_best[i] = best_pop
+        # setting number of attacked successfully images (of src + diffusion imgs)
+        return best_succeeded_pops_ind, best_succeeded_pops_mean_score
+
+    def update_best_softmax_scores(self, fitness_score, i, pops, succeeded_pops, success_indicator_index,
+                                   softmax_for_atatcked_label_all):
+
+        self.p_best_n_success_imgs[i] = succeeded_pops.max()
+        # Calculate mean score for all images with same succeded pop:7
+        # Create a mask for getting score for differenet images with same score,
+        total_imgs_in_attack = int(len(fitness_score) / len(pops))
+        min_index_class, smallest_score_for_attacked_class, best_succeeded_pops_ind, best_succeeded_pops_mean_score = self.find_best_diffusion_index_success(
+            pops, succeeded_pops, success_indicator_index, total_imgs_in_attack, softmax_for_atatcked_label_all)
+        mask = [int(i * len(pops) + best_succeeded_pops_ind) for i in range(total_imgs_in_attack)]
+        # mask = [int(i * len(pops) + succeeded_pops.argmax()) for i in range(total_imgs_in_attack)]
+        # Taking softmax scores for all attacked images with same pop
+        self.softmax_scores[i] = softmax_for_atatcked_label_all[mask]
+        self.is_attack_succeeded_for_each_img[i] = [
+            True if score_ind in success_indicator_index else False for score_ind in mask]
+        self.lowest_softmax_for_attacked_class[i] = smallest_score_for_attacked_class
+        self.lowest_softmax_for_attacked_class_succeeded[i] = min_index_class in success_indicator_index
+        self.lowest_softmax_for_attacked_class_index[i] = min_index_class
+        self.is_lowest_softmax_for_attacked_class_in_best_chosen_pop[i] = min_index_class % len(pops) == best_succeeded_pops_ind
+        self.best_succeeded_pops_mean_scores[i] = best_succeeded_pops_mean_score
+
+        return best_succeeded_pops_ind, best_succeeded_pops_mean_score, mask, total_imgs_in_attack
+
+    def find_best_diffusion_index_success(self, pops, succeeded_pops, success_indicator_index, total_imgs_in_attack,
+                                          softmax_for_atatcked_label_all):
+        succeeded_n_imgs = succeeded_pops.max()
+        min_index_class = np.argmin(softmax_for_atatcked_label_all)
+        smallest_score_for_attacked_class = softmax_for_atatcked_label_all[min_index_class]
+        pops_len = len(pops)
+        min_index_pop = min_index_class % pops_len
+        if succeeded_n_imgs == 0:
+            pop_indexs = [int(i * pops_len + min_index_pop) for i in range(total_imgs_in_attack)]
+            scores = softmax_for_atatcked_label_all[pop_indexs]
+            scores_mean = np.mean(scores)
+            return min_index_class, smallest_score_for_attacked_class, min_index_pop, scores_mean
+
+        best_succeeded_pops_mean_score = torch.inf
+        best_succeeded_pops_ind = -1
+        # Find index in succeeded_pops that has the max value and lowest prediction for required attacked class
+        for ind in range(len(succeeded_pops)):
+            if succeeded_pops[ind] == succeeded_n_imgs:
+                # get all indexes of this pop:
+                pop_indexs = [int(i * len(pops) + ind) for i in range(total_imgs_in_attack)]
+                # scores = fitness_score[pop_indexs]  # TODO: check this, shouldn't it be softmax?
+                scores = softmax_for_atatcked_label_all[pop_indexs]  # TODO: check this, shouldn't it be softmax?
+                mean_score = np.sum(scores) / total_imgs_in_attack
+                if mean_score < best_succeeded_pops_mean_score:
+                    best_succeeded_pops_mean_score = mean_score
+                    best_succeeded_pops_ind = ind
+
+        return min_index_class, smallest_score_for_attacked_class, best_succeeded_pops_ind, best_succeeded_pops_mean_score
 
     def compute_best_pop_params_considering_diffusion_imgs(self, fitness_score, pops, success_indicator_index):
         g_fitness_sum = 0
@@ -530,12 +667,12 @@ class PSOAttack(object):
     @torch.no_grad()
     def calculate_fitness(self, images: np.ndarray) -> torch.Tensor:
         if(not isinstance(images, list) and len(images.shape)==3):
-            images = self.models_wrapper[0].pre_process_image(images, device=DEVICE, use_interpolate=self.models_wrapper[0].use_interpolate)
+            images = self.models_wrapper[0].pre_process_image(images, device=self.device, use_interpolate=self.models_wrapper[0].use_interpolate)
         else:
             resized_images=[]
             num_of_images = len(images) if isinstance(images, list) else images.shape[0]
             for i in range(num_of_images):
-                resized_images.append(self.models_wrapper[0].pre_process_image(images[i], device=DEVICE, use_interpolate=self.models_wrapper[0].use_interpolate))
+                resized_images.append(self.models_wrapper[0].pre_process_image(images[i], device=self.device, use_interpolate=self.models_wrapper[0].use_interpolate))
             resized_images = torch.stack(resized_images, dim=0)
             if len(resized_images.shape) == 5:
                 resized_images = resized_images.squeeze(1)
@@ -578,9 +715,9 @@ class PSOAttack(object):
 
     def update(self, orig_image, cropped_image, image: np.ndarray, bbx, label: torch.Tensor, itr: int,
                filename: str = "test_update", diffusion_imgs: DiffusionImages = None):
-        c1 = c_list[0]
-        c2 = c_list[1]
-        c3 = c_list[2]
+        c1 = self.c_list[0]
+        c2 = self.c_list[1]
+        c3 = self.c_list[2]
         w = self.calculate_omega(itr)
         image_raw = copy.deepcopy(image)
         cropped_image_raw = copy.deepcopy(cropped_image)
@@ -632,15 +769,29 @@ class PSOAttack(object):
             current_adv_images, current_adv_params = self.gen_adv_images_by_pops(image_raw, self.pops[i])
             if diffusion_imgs is not None:
                 current_adv_images, current_adv_large_images_by_prompt_desc = self.generate_diffusion_images_conatining_attack(current_adv_images, orig_image_raw,
-                                                                              cropped_image_raw, bbx, train=True, filename=filename, iter=i, initialize=False)
+                                                                              cropped_image_raw, bbx, train=True, filename=filename, main_itr=itr, iter=i, initialize=False)
                 # current_adv_images, current_adv_params = self.gen_adv_to_multiple_imgs(current_adv_images, current_adv_params, self.pops[i], diffusion_imgs)
 
             softmax = self.calculate_fitness(current_adv_images)
             fitness_score, pred_labels = torch.max(softmax, dim=1)
+            softmax_numpy = copy.deepcopy(softmax).detach().cpu().numpy()
 
             # If find the best solution, then exist
             success_indicator = (pred_labels != label)
+
+            min_index_class, smallest_score_for_class = self.get_smallest_index_and_score_for_attacking_class(softmax_numpy, label)
+            smallest_score_attack_succeeded = pred_labels[min_index_class] != label
+
+
+            if diffusion_imgs is not None:
+                self.add_score_and_indication_if_attack_succeeded_to_img_names(softmax_numpy[:, label],
+                                                                  success_indicator, len(self.pops),
+                                                                  train=True, filename=filename,
+                                                                   main_itr=itr,
+                                                                  iter=i, initialize=False)
             success_indicator_index = torch.where(success_indicator)[0]
+            # self.find_best_result_for_current_iteration(softmax_numpy, success_indicator_index, label)
+
             success_indicator_index = success_indicator_index.cpu().data.numpy()
             if len(success_indicator_index) >= 1:
                 # if success_indicator.sum().item() >= 1:
@@ -652,16 +803,17 @@ class PSOAttack(object):
                         # succeeded_pops[pop_ind % 30] += 1
                         succeeded_pops[pop_ind % len(self.pops)] += 1
                     if succeeded_pops.max() > self.best_pop_on_src_and_diffusoin_count_imgs_success:
-                        self.update_iteration_params(fitness_score, i, self.pops[i], succeeded_pops,
-                                                     success_indicator_index)
-                        self.update_best_pop_attack(i, succeeded_pops, current_adv_large_images_by_prompt_desc)
+                        best_succeeded_pops_ind, best_succeeded_pops_mean_score = self.update_iteration_params(fitness_score, i, self.pops[i], succeeded_pops,
+                                                     success_indicator_index, softmax_numpy[:, label])
+                        self.update_best_pop_attack(i, succeeded_pops, best_succeeded_pops_ind, best_succeeded_pops_mean_score, current_adv_large_images_by_prompt_desc)
                         print(f"【{itr}/{self.max_iter}】Success on {succeeded_pops.max()} imgs: g_fitness: {self.g_best_fitness}, p_fitness: {self.p_best_fitness[i]}, prediction: {pred_labels[success_indicator.cpu().data.numpy()][0]}, probability: {fitness_score[success_indicator.cpu().data.numpy()][0]}")
 
                     # if succeeded_pops.max() == (len(diffusion_imgs.generated_imgs_train_cropped_names) + 1):
                     if succeeded_pops.max() == (len(diffusion_imgs.generated_imgs_train_cropped_names) / 2) + 1:
-                        self.update_iteration_params(fitness_score, i, self.pops[i], succeeded_pops,
-                                                     success_indicator_index)
-                        self.update_best_pop_attack(i, succeeded_pops, current_adv_large_images_by_prompt_desc)
+                        best_succeeded_pops_ind, best_succeeded_pops_mean_score = self.update_iteration_params(fitness_score, i, self.pops[i], succeeded_pops,
+                                                     success_indicator_index, softmax_numpy[:, label])
+                        self.update_best_pop_attack(i, succeeded_pops, best_succeeded_pops_ind, best_succeeded_pops_mean_score,
+                                                    current_adv_large_images_by_prompt_desc)
 
                         # TODO: apply attack to test generated images...
                         print(f"{filename}: 【{itr}/{self.max_iter}】 i-{i} Success all: g_fitness: {self.g_best_fitness}, p_fitness: {self.p_best_fitness[i]}, prediction: {pred_labels[success_indicator.cpu().data.numpy()][0]}, probability: {fitness_score[success_indicator.cpu().data.numpy()][0]}")
@@ -671,8 +823,8 @@ class PSOAttack(object):
                     #         fitness_score, self.pops[i], success_indicator_index)
                     else:
                         if succeeded_pops.max() > self.p_best_n_success_imgs[i]:
-                            self.update_iteration_params(fitness_score, i, self.pops[i], succeeded_pops,
-                                                    success_indicator_index)
+                            best_succeeded_pops_ind, best_succeeded_pops_mean_score = self.update_iteration_params(fitness_score, i, self.pops[i], succeeded_pops,
+                                                    success_indicator_index, softmax_numpy[:, label])
                 else:
                     best_pop = self.pops[i][success_indicator_index[0]]
                     self.best_pop_on_src_and_diffusoin = best_pop
@@ -688,6 +840,11 @@ class PSOAttack(object):
                         f"{filename}: 【{itr}/{self.max_iter}】 i-{i} Success: g_fitness: {self.g_best_fitness}, p_fitness: {self.p_best_fitness[i]}, prediction: {pred_labels[success_indicator.cpu().data.numpy()][0]}, probability: {fitness_score[success_indicator.cpu().data.numpy()][0]}")
                     return True
             else:
+
+                if diffusion_imgs is not None:
+                    best_succeeded_pops_ind, best_succeeded_pops_mean_score, mask, total_imgs_in_attack = self.update_best_softmax_scores(
+                        fitness_score, i, self.pops[i], succeeded_pops, success_indicator_index, softmax_numpy[:, label])
+
                 g_fitness = torch.sum(fitness_score).item()
                 p_best_idx = torch.argmin(fitness_score)
                 g_fitness_real = torch.min(fitness_score)
@@ -739,11 +896,13 @@ class PSOAttack(object):
         g_fitness_min_avg_score_failed_ind = torch.argmin(pop_scores_by_img)
 
         return g_fitness_sum_score_failed, g_fitness_min_avg_score_failed, g_fitness_min_avg_score_failed_ind
-    def update_best_pop_attack(self, i, succeeded_pops, best_diffusion_imgs_by_prompt_desc: Dict[str, PIL.Image.Image]):
+    def update_best_pop_attack(self, i, succeeded_pops, best_succeeded_pops_ind, best_succeeded_pops_mean_score, best_diffusion_imgs_by_prompt_desc: Dict[str, PIL.Image.Image]):
         self.best_pop_on_src_and_diffusoin_count_imgs_success = succeeded_pops.max()
-        best_pop = self.pops[i][succeeded_pops.argmax()]
+        best_pop = self.pops[i][best_succeeded_pops_ind]
+        # best_pop = self.pops[i][succeeded_pops.argmax()]
         self.best_pop_on_src_and_diffusoin = best_pop
         self.best_diffusion_imgs_by_prompt_desc = best_diffusion_imgs_by_prompt_desc
+        self.best_succeeded_pops_mean_scores[i] = best_succeeded_pops_mean_score
         # self.p_best[i] = best_pop
         self.g_best = self.p_best[i]
         self.sg_best = self.p_best[i]
@@ -803,6 +962,7 @@ class PSOAttack(object):
             if attack_with_diffusion:
                 is_find_init = self.initialize(orig_img, cropped_img, cropped_resized_img, bbx, pred_label, filename,
                                                diffusion_imgs)
+                self.save_info(itr=-1)
             else:
                 is_find_init = self.initialize(orig_img, cropped_img, cropped_resized_img, bbx, pred_label, filename,
                                                None)
@@ -818,6 +978,8 @@ class PSOAttack(object):
                 if attack_with_diffusion:
                     is_find_search = self.update(orig_img, cropped_img, cropped_resized_img, bbx, pred_label, itr,
                                                  filename, diffusion_imgs)
+                    self.save_info(itr)
+
                 else:
                     is_find_search = self.update(orig_img, cropped_img, cropped_resized_img, bbx, pred_label, itr,
                                                  filename, None)
@@ -829,9 +991,11 @@ class PSOAttack(object):
 
             self.save_adv_images(cropped_resized_img, orig_img, cropped_img, bbx, filename, attack_with_diffusion=attack_with_diffusion, diffusion_imgs=diffusion_imgs)
 
-            # TODO: remove this break
             if i==1:
                 break
+            # # TODO: remove this break
+            # if i==1:
+            #     break
 
         asr = round(100 * (success_cnt / total), 2)
 
@@ -909,13 +1073,13 @@ class PSOAttack(object):
 
     @timeit
     def generate_diffusion_images_conatining_attack(self, adv_images, src_orig_image, src_cropped_image, bbx,
-                                                    train: bool = True, filename: str = None, iter=None, initialize: bool = True):
+                                                    train: bool = True, filename: str = None, main_itr=None, iter=None, initialize: bool = True):
         sub_dir = 'init' if initialize else 'non_init'
-        current_logs_dir = os.path.join(self.logs_dir, filename, sub_dir, str(iter))
+        current_logs_dir = os.path.join(self.logs_dir, filename, sub_dir, str(main_itr), str(iter))
         os.makedirs(current_logs_dir, exist_ok=True)
 
         for adv_i, adv_img in enumerate(adv_images):
-            adv_img_out_name = f'init-{int(initialize)}_iter-{iter}_adv-{adv_i}.png'
+            adv_img_out_name = f'init-{int(initialize)}_mainItr-{main_itr}_iter-{iter}_adv-{adv_i}.png'
             cv2.imwrite(os.path.join(current_logs_dir, adv_img_out_name), adv_images[adv_i])
 
         prompt_types = GENERATED_IMAGES_TYPES_TRAIN if train else GENERATED_IMAGES_TYPES_TEST
@@ -941,7 +1105,7 @@ class PSOAttack(object):
                                                                                        model_type, prompt_desc,
                                                                                        result_image)
 
-                    img_out_name = f'init-{int(initialize)}_{model_type}_iter-{iter}_{prompt_desc}-{i}.png'
+                    img_out_name = f'init-{int(initialize)}_{model_type}_mainItr-{main_itr}_iter-{iter}_{prompt_desc}_adv-{i}.png'
                     result_image_resized_cropped = self.process_image_after_diffusion_generation(copy.deepcopy(result_image), bbx, adv_images.shape[1:3])
                     cv2.imwrite(os.path.join(current_logs_dir, img_out_name), result_image_resized_cropped)
                     if adv_images.shape[0] == 1:
@@ -954,6 +1118,7 @@ class PSOAttack(object):
                     # # all_diffusion_adv_images_info[ind + i][prompt_desc] = {"ind+i": ind+i, "cropped_resize_img": result_image_resized_cropped, "large_adv_image": result_image}
                     # all_diffusion_adv_images_info = {}
                     all_diffusion_adv_images_list.append(result_image_resized_cropped)
+
                 ind += 15
                 cnt += 1
         adv_images = np.stack(all_diffusion_adv_images_list, 0)
@@ -961,8 +1126,37 @@ class PSOAttack(object):
 
         return adv_images, all_diffusion_adv_images_info
 
-    @timeit
+    def add_score_and_indication_if_attack_succeeded_to_img_names(self, softmax_scores_for_class,
+                                                                  success_indicator, pops_len,
+                                                                  train: bool = True, filename: str = None,
+                                                                  main_itr=None, iter=None, initialize: bool = True):
+        sub_dir = 'init' if initialize else 'non_init'
+        current_logs_dir = os.path.join(self.logs_dir, filename, sub_dir, str(main_itr), str(iter))
 
+        for adv_i in range(pops_len):
+            adv_img_out_name = f'init-{int(initialize)}_mainItr-{main_itr}_iter-{iter}_adv-{adv_i}.png'
+            new_name = '.'.join(adv_img_out_name.split('.')[:-1]) + f'_score-{softmax_scores_for_class[adv_i].item():.2f}_attackSuccess-{int(success_indicator[adv_i].item()):.2f}.png'
+            # print(f"file exist: {os.path.exists(os.path.join(current_logs_dir, adv_img_out_name))}")
+            os.rename(os.path.join(current_logs_dir, adv_img_out_name), os.path.join(current_logs_dir, new_name))
+
+        prompt_types = GENERATED_IMAGES_TYPES_TRAIN if train else GENERATED_IMAGES_TYPES_TEST
+
+        model_type = 'local' if self.stable_diffusion_model is not None else 'api'
+        prompt_ind = 1
+        for prompt_desc, cur_prompt in prompt_getter.items():
+            if prompt_desc in prompt_types:
+                for ind in range(pops_len):
+                    adv_i = prompt_ind * pops_len + ind
+                    img_out_name = f'init-{int(initialize)}_{model_type}_mainItr-{main_itr}_iter-{iter}_{prompt_desc}_adv-{ind}.png'
+                    new_name = '.'.join(img_out_name.split('.')[:-1]) + f'_score-{softmax_scores_for_class[adv_i].item():.2f}_attackSuccess-{int(success_indicator[adv_i].item()):.2f}.png'
+                    # print(f"file exist: {os.path.exists(os.path.join(current_logs_dir, img_out_name))}")
+                    os.rename(os.path.join(current_logs_dir, img_out_name), os.path.join(current_logs_dir, new_name))
+
+                prompt_ind += 1
+
+
+
+    @timeit
     def run_stable_diffusion_using_api(self, adv_image_large_pil, cur_prompt, model_type, prompt_desc, result_image):
         result_image = self.generate_diffusion_image_using_api(prompt_desc=prompt_desc,
                                                                prompt=cur_prompt + ". do not change the hexagon shadow in the middle of the stop sign",
@@ -974,14 +1168,20 @@ class PSOAttack(object):
 
     @timeit
     def run_stable_diffusion(self, adv_image_large_pil, cur_prompt):
+        reinitialize_generator(self.generator, self.generator_seed)
         result_image = self.stable_diffusion_model(
-            prompt=cur_prompt + ". do not change the rectangle shadow in the middle of the stop sign",
-            image=adv_image_large_pil, negative_prompt=NEGATIVE_PROMPT, **self.stable_diffusion_main_params)
+            prompt=cur_prompt + ". do not change the rectangle shadow inside the stop sign",
+            # prompt=cur_prompt + ". do not change the rectangle shadow in the middle of the stop sign",
+            generator=self.generator,
+            image=adv_image_large_pil,
+            negative_prompt=NEGATIVE_PROMPT,
+            **self.stable_diffusion_main_params)
         model_type = 'local'
         result_image = result_image.images[0]
         return model_type, result_image
 
-    def numpy_to_pil_img_for_diffusion_model(self, numpy_images):
+    @staticmethod
+    def numpy_to_pil_img_for_diffusion_model(numpy_images):
         pil_images = []
         for numpy_image in numpy_images:
             # Convert NumPy array to PIL Image
@@ -996,7 +1196,9 @@ class PSOAttack(object):
             pil_images.append(pil_image)
 
         return pil_images
-    def insert_cropped_resized_with_attack_into_large_image(self, adv_images, src_orig_image, src_cropped_image, bbx):
+
+    @staticmethod
+    def insert_cropped_resized_with_attack_into_large_image(adv_images, src_orig_image, src_cropped_image, bbx):
         all_adv_large_images = []
         for ind in range(adv_images.shape[0]):
             adv_large = copy.deepcopy(src_orig_image)
@@ -1008,7 +1210,8 @@ class PSOAttack(object):
 
         return all_adv_large_images
 
-    def process_image_after_diffusion_generation(self, result_image, bbx, new_shape):
+    @staticmethod
+    def process_image_after_diffusion_generation(result_image, bbx, new_shape):
         img = np.array(result_image)
         xmin, ymin, xmax, ymax = bbx
         img_cropped = crop_image(img, xmin, ymin, xmax, ymax)
@@ -1016,7 +1219,8 @@ class PSOAttack(object):
 
         return img_cropped_resized
 
-    def generate_diffusion_image_using_api(self, prompt_desc, prompt, image, negative_prompt, params):
+    @staticmethod
+    def generate_diffusion_image_using_api(prompt_desc, prompt, image, negative_prompt, params):
         breaker = False
         max_retries = 5
         retry_count = 0
@@ -1042,9 +1246,9 @@ class PSOAttack(object):
         url = URL_BASE + URL_SUFFIX
 
         while retry_count < max_retries:
-            seed = random.randint(1, 2147483647)
-            print(seed)
-            bearer_token = TOKENS[5]
+            seed = 525901257    #random.randint(1, 2147483647)
+            print(f"seed: {seed}")
+            bearer_token = TOKENS[6]
 
             # convert the image to base64 encoding
             _, buffer = cv2.imencode('.jpg', np.array(image))
@@ -1093,6 +1297,57 @@ class PSOAttack(object):
                 break
 
         return None
+
+    def save_info(self, itr):
+        # Saving data from different self params from reset_attack_params that has info on each inner iteration
+        # and each inner iteration will be a line in a dataframe, and in each itr we append to the file
+        path_pkl = os.path.join(self.logs_dir, f'iterations_info.pkl')
+        path_csv = os.path.join(self.logs_dir, f'iterations_info.csv')
+
+        # Creating a dictionary to store information for each iteration
+        iteration_data = {
+            "main_itr": itr,
+            'i': list(np.arange(len(self.lowest_softmax_for_attacked_class_index))),
+            "total_succeeded_in_iteration": self.total_succeeded_in_iteration,
+            'p_best_fitness': [float(x.detach().cpu().numpy()) if isinstance(x, torch.Tensor) else x for x in self.p_best_fitness],
+            'best_succeeded_pops_mean_scores': [np.round(x, 3) for x in self.best_succeeded_pops_mean_scores],
+            'softmax_scores': self.softmax_scores,
+            'is_attack_succeeded_for_each_img': self.is_attack_succeeded_for_each_img,
+            'lowest_softmax_for_attacked_class': [np.round(x, 3) for x in self.lowest_softmax_for_attacked_class],
+            'lowest_softmax_for_attacked_class_index': self.lowest_softmax_for_attacked_class_index,
+            'is_lowest_softmax_for_attacked_class_in_best_chosen_pop': self.is_lowest_softmax_for_attacked_class_in_best_chosen_pop,
+            'p_best': [x[1] for x in self.p_best],
+            # 'g_best': [x.item() for x in self.g_best]
+        }
+
+        # is_attack_succeeded_for_lowst_softmax_for_attacked_class
+
+        # Convert the dictionary to a DataFrame
+        iteration_df = pd.DataFrame(iteration_data)
+
+        self.save_iteration_info_to_pickle(iteration_df, path_pkl)
+
+        self.save_iteration_info_to_csv(iteration_df, path_csv)
+
+    def save_iteration_info_to_csv(self, iteration_df, path_csv):
+        # Save to CSV
+        if not os.path.exists(path_csv):
+            # If the file doesn't exist, simply save the DataFrame to it
+            iteration_df.to_csv(path_csv, index=False)
+        else:
+            # If the file exists, append the new data to it
+            iteration_df.to_csv(path_csv, mode='a', header=False, index=False)
+
+    def save_iteration_info_to_pickle(self, iteration_df, path_pkl):
+        # Appending the DataFrame to the file
+        if not os.path.exists(path_pkl):
+            # If file doesn't exist, create a new file and save the DataFrame
+            iteration_df.to_pickle(path_pkl)
+        else:
+            # If file exists, append the DataFrame to the existing file
+            existing_df = pd.read_pickle(path_pkl)
+            updated_df = pd.concat([existing_df, iteration_df], ignore_index=True)
+            updated_df.to_pickle(path_pkl)
 
 
 def set_bounds(args: argparse.ArgumentParser) -> List[float]:
@@ -1204,10 +1459,13 @@ def main():
                     shape_type=args.shape_type,
                     save_dir=experiment_dir,
                     logs_dir=log_dir,
-                    device=device
+                    device=device,
+                    generator_seed=args.generator_seed,
+                    generator = get_generator(args.generator_seed) if args.diffusion_model_local else None
                     )
 
     # asr = pso.run_pso(file_names, orig_imgs, cropped_imgs, cropped_resized_imgs, labels, bbx, masks_cropped)
+
     stable_diffusion_model = load_stable_diffusion_xl() if args.diffusion_model_local else None
     asr_without_diffusion = pso.run_pso_with_diffusion_imgs(file_names, orig_imgs, cropped_imgs, cropped_resized_imgs,
                                                             labels, bbx, masks_cropped, attack_with_diffusion=False,
@@ -1234,5 +1492,5 @@ def main():
     print("Finished !!!")
 
 
-if __name__ == "__main__":
-    main()
+# if __name__ == "__main__":
+    # main()

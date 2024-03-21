@@ -50,7 +50,7 @@ def inference_folder_with_sub_attack_folders_with_attacked_images(model_name: st
     model_wrapper, true_label = load_model_and_set_true_label(is_adv_model, model_name, crop_size)
     device = DEVICE
     for file_dir_name in os.listdir(experiment_folder):
-        if file_dir_name.lower() != 'black_box':
+        if file_dir_name.lower() != 'black_box' and file_dir_name.lower() != 'logs':
             success_at_least_one_diffusion_image_of_image_dir = False
             file_dir = os.path.join(experiment_folder, file_dir_name)
             if os.path.isdir(file_dir):
