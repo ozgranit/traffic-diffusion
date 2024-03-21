@@ -65,7 +65,14 @@ def __create_pair_plots_helper(road_folder: str):
 def create_pair_plots(root_dir: str):
     # Loop through the "road_x" folders
     for road_folder in os.listdir(root_dir):
+        if not road_folder.startswith("road_"):
+            continue
         road_path = os.path.join(root_dir, road_folder)
         if os.path.isdir(road_path):
             __create_pair_plots_helper(road_path)
     print("Pair plots created successfully.")
+
+def plot_image(img, title: str =""):
+    plt.imshow(img)
+    plt.title(title)
+    plt.show()

@@ -30,6 +30,7 @@ URL_SUFFIX = '/stable-diffusion-xl/image-to-image'
 INPUT_FOLDER = r'/workspace/traffic-diffusion/datasets/imags_with_shadow/input_large_src_with_shadow' #'api_input/'
 OUTPUT_FOLDER = r'/workspace/traffic-diffusion/datasets/imags_with_shadow/output_locally_tmp_'   #'api_output/'
 
+from seed import *
 
 def load_images(folder_path, images_filter=None):
     if images_filter is None:
@@ -44,14 +45,22 @@ def load_images(folder_path, images_filter=None):
             original_images[filename.split('.')[0]] = img
     return original_images
 
+def get_generator(gen_seed):
+    generator = torch.Generator(device="cuda").manual_seed(gen_seed)
+
+    return generator
+
+def reinitialize_generator(generator, gen_seed):
+    generator.manual_seed(gen_seed)
+
 def load_stable_diffusion_xl():
     pipe = StableDiffusionXLImg2ImgPipeline.from_pretrained(
-        "stabilityai/stable-diffusion-xl-refiner-1.0", torch_dtype=torch.float16
+        "stabilityai/stable-diffusion-xl-refiner-1.0", torch_dtype=torch.float16, use_safetensors=True
     )
     pipe = pipe.to("cuda")
 
     return pipe
-def stable_diffusion_xl(model, image, prompt, negative_prompt, strength, steps,
+def stable_diffusion_xl(model, generator, image, prompt, negative_prompt, strength, steps,
                         guidance, seed):
     # Assuming diffusers is a module with the stable diffusion model implementation
     # # Convert the image to the required format (replace this with actual preprocessing if needed)
@@ -61,7 +70,7 @@ def stable_diffusion_xl(model, image, prompt, negative_prompt, strength, steps,
 
     # Run the model inference
     # TODO: insert attack to orig large image, and send that to stable diffusion. then crop it again
-    result_image = model(prompt=prompt, image=image, negative_prompt=negative_prompt, strength=strength, num_inference_steps=steps, guidance_scale=guidance)
+    result_image = model(prompt=prompt, generator=generator, image=image, negative_prompt=negative_prompt, strength=strength, num_inference_steps=steps, guidance_scale=guidance)
 
     return result_image
 
