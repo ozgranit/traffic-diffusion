@@ -32,9 +32,12 @@ def load_images(folder_path, images_filter=None):
         images_filter = []
     original_images = {}
     for filename in os.listdir(folder_path):
-        mask_folder_path = r'/workspace/traffic-diffusion/datasets/imags_with_shadow/input_large_src_mask_attack'
+        mask_folder_path = r'datasets/imags_with_shadow/input_large_src_mask_attack'
         img = cv2.imread(os.path.join(folder_path, filename))
-        mask = cv2.imread(os.path.join(mask_folder_path, filename))
+        mask_path = os.path.join(mask_folder_path, filename)
+        if not os.path.exists(mask_path):
+            continue
+        mask = cv2.imread(mask_path)
         # image_num = int(filename.split('.')[0].split('_')[1])
         # if img is not None and image_num not in images_filter:
         if img is not None:
