@@ -100,7 +100,7 @@ class PSOAttack(object):
                  logs_dir='logs',
                  device = DEVICE,
                  generator_seed=525901257,
-                 generator=None
+                 generator=None,
                  ):
 
         # self.init_iterations = List[IterationInfo] = []
