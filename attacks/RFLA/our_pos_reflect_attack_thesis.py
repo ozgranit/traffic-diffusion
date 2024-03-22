@@ -353,7 +353,7 @@ class PSOAttack(object):
                                                                 main_itr=-1, iter=i, initialize=True)
             # success_indicator_ = success_indicator.cpu().data.numpy()
             success_indicator_index = torch.where(success_indicator)[0]
-
+            print(f"success_indicator_index: {success_indicator_index}")
             # self.find_best_result_for_current_iteration(softmax, success_indicator_index)
             min_index_class, smallest_score_for_class = self.get_smallest_index_and_score_for_attacking_class(softmax_numpy, label)
             smallest_score_attack_succeeded = pred_labels[min_index_class] != label
@@ -962,7 +962,7 @@ class PSOAttack(object):
             if attack_with_diffusion:
                 is_find_init = self.initialize(orig_img, cropped_img, cropped_resized_img, bbx, pred_label, filename,
                                                diffusion_imgs)
-                self.save_info(itr=-1)
+                self.save_info(filename, itr=-1)
             else:
                 is_find_init = self.initialize(orig_img, cropped_img, cropped_resized_img, bbx, pred_label, filename,
                                                None)
@@ -971,14 +971,14 @@ class PSOAttack(object):
                 success_cnt += 1
                 print("Initial found!!!")
                 print("==" * 30)
-                self.save_adv_images(cropped_resized_img, orig_img, cropped_img, bbx, filename, attack_with_diffusion=attack_with_diffusion, diffusion_imgs=diffusion_imgs)
+                self.save_adv_images(cropped_resized_img, orig_img, cropped_img, bbx, filename, attack_with_diffusion=attack_with_diffusion, diffusion_imgs=diffusion_imgs, main_itr = -1)
                 continue
 
             for itr in range(self.max_iter):
                 if attack_with_diffusion:
                     is_find_search = self.update(orig_img, cropped_img, cropped_resized_img, bbx, pred_label, itr,
                                                  filename, diffusion_imgs)
-                    self.save_info(itr)
+                    self.save_info(filename, itr=itr)
 
                 else:
                     is_find_search = self.update(orig_img, cropped_img, cropped_resized_img, bbx, pred_label, itr,
@@ -989,7 +989,7 @@ class PSOAttack(object):
                     print("==" * 30)
                     break
 
-            self.save_adv_images(cropped_resized_img, orig_img, cropped_img, bbx, filename, attack_with_diffusion=attack_with_diffusion, diffusion_imgs=diffusion_imgs)
+            self.save_adv_images(cropped_resized_img, orig_img, cropped_img, bbx, filename, attack_with_diffusion=attack_with_diffusion, diffusion_imgs=diffusion_imgs, main_itr=itr)
 
             if i==1:
                 break
@@ -1001,7 +1001,7 @@ class PSOAttack(object):
 
         return asr
 
-    def save_adv_images(self, image: np.ndarray, orig_image, orig_cropped_image, bbx, filename: str, attack_with_diffusion: bool = False, diffusion_imgs: DiffusionImages = None):
+    def save_adv_images(self, image: np.ndarray, orig_image, orig_cropped_image, bbx, filename: str, attack_with_diffusion: bool = False, diffusion_imgs: DiffusionImages = None, main_itr = None):
         filename_without_ext = filename.split('.')[0]
         best_pop = self.best_pop_on_src_and_diffusoin
         if best_pop is None:
@@ -1032,6 +1032,7 @@ class PSOAttack(object):
                                                                                                                bbx,
                                                                                                                train=False,
                                                                                                                filename=filename,
+                                                                                                               main_itr=main_itr,
                                                                                                                iter=-1,
                                                                                                                initialize=False)
                 for ind, diffusion_adv_data in diffusion_adv_large_images_by_prompt_desc.items():
@@ -1298,7 +1299,7 @@ class PSOAttack(object):
 
         return None
 
-    def save_info(self, itr):
+    def save_info(self, filename: str, itr: int):
         # Saving data from different self params from reset_attack_params that has info on each inner iteration
         # and each inner iteration will be a line in a dataframe, and in each itr we append to the file
         path_pkl = os.path.join(self.logs_dir, f'iterations_info.pkl')
@@ -1306,6 +1307,7 @@ class PSOAttack(object):
 
         # Creating a dictionary to store information for each iteration
         iteration_data = {
+            "fname": filename,
             "main_itr": itr,
             'i': list(np.arange(len(self.lowest_softmax_for_attacked_class_index))),
             "total_succeeded_in_iteration": self.total_succeeded_in_iteration,
@@ -1315,6 +1317,7 @@ class PSOAttack(object):
             'is_attack_succeeded_for_each_img': self.is_attack_succeeded_for_each_img,
             'lowest_softmax_for_attacked_class': [np.round(x, 3) for x in self.lowest_softmax_for_attacked_class],
             'lowest_softmax_for_attacked_class_index': self.lowest_softmax_for_attacked_class_index,
+            'lowest_softmax_for_attacked_class_succeeded': self.lowest_softmax_for_attacked_class_succeeded,
             'is_lowest_softmax_for_attacked_class_in_best_chosen_pop': self.is_lowest_softmax_for_attacked_class_in_best_chosen_pop,
             'p_best': [x[1] for x in self.p_best],
             # 'g_best': [x.item() for x in self.g_best]
