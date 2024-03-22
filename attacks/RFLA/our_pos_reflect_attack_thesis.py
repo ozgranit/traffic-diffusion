@@ -101,10 +101,12 @@ class PSOAttack(object):
                  device = DEVICE,
                  generator_seed=525901257,
                  generator=None,
+                 early_stopping=True
                  ):
 
         # self.init_iterations = List[IterationInfo] = []
         # self.update_iterations = List[IterationInfo] = []
+        self.early_stopping = early_stopping
         self.dimension = dimension  # the dimension of the base variable
         self.max_iter = max_iter  # maximum iterative number
         self.size = size  # the size of the particle
@@ -313,6 +315,7 @@ class PSOAttack(object):
     def initialize(self, orig_image, cropped_image, image: np.ndarray, bbx, label: torch.Tensor, filename: str = "test",
                    diffusion_imgs: DiffusionImages = None):
         print(f"Initialize {filename}")
+        is_find_init = False    # For early stopping
         image_raw = copy.deepcopy(image)
         cropped_image_raw = copy.deepcopy(cropped_image)
         orig_image_raw = copy.deepcopy(orig_image)
@@ -384,13 +387,16 @@ class PSOAttack(object):
 
                     if succeeded_pops.max() == (len(diffusion_imgs.generated_imgs_train_cropped_names) / 2) + 1:
                         best_succeeded_pops_ind, best_succeeded_pops_mean_score = self.update_iteration_params(fitness_score, i, self.pops[i], succeeded_pops,
-                                                     success_indicator_index, softmax_numpy[:, label])
+                                                                                                               success_indicator_index, softmax_numpy[:, label])
                         self.update_best_pop_attack(i, succeeded_pops, best_succeeded_pops_ind, best_succeeded_pops_mean_score, adv_large_images_by_prompt_desc)
 
                         # TODO: apply attack to test generated images...
                         print(
                             f"Initialize Success All {filename}, i-{i}: g_fitness: {self.g_best_fitness}, p_fitness: {self.p_best_fitness[i]}, prediction: {pred_labels[success_indicator.cpu().data.numpy()][0]}, probability: {fitness_score[success_indicator.cpu().data.numpy()][0]}")
-                        return True
+                        is_find_init = True
+                        if self.early_stopping:
+                            return is_find_init
+
                     #---------------
                     # if succeeded_pops.max() == (len(diffusion_imgs.generated_imgs_train_cropped_names) + 1):
                     #     # TODO: apply attack to test generated images...
@@ -450,7 +456,9 @@ class PSOAttack(object):
                     # Image.fromarray(image2saved_).save(fr'{self.save_dir}/{filename}.png')
                     print(
                         f"Initialize Success {filename}: g_fitness: {self.g_best_fitness}, g_fitness_real: {self.sg_best_fitness}, p_fitness: {self.p_best_fitness[i]}, prediction: {pred_labels[success_indicator.cpu().data.numpy()][0]}, probability: {fitness_score[success_indicator.cpu().data.numpy()][0]}")
-                    return True
+                    is_find_init = True
+                    if self.early_stopping:
+                        return is_find_init
             else:
 
                 if diffusion_imgs is not None:
@@ -493,7 +501,7 @@ class PSOAttack(object):
                 #                                         smallest_score_attack_succeeded,
                 #                                         diffusion_imgs, 0)
 
-        return False
+        return is_find_init # usually if early_stopping is True and we got here, we return False
 
     def find_best_result_for_current_iteration(self, softmax, success_indicator_index, label):
         if len(success_indicator_index) > 0:
@@ -715,6 +723,7 @@ class PSOAttack(object):
 
     def update(self, orig_image, cropped_image, image: np.ndarray, bbx, label: torch.Tensor, itr: int,
                filename: str = "test_update", diffusion_imgs: DiffusionImages = None):
+        is_find_search = False
         c1 = self.c_list[0]
         c2 = self.c_list[1]
         c3 = self.c_list[2]
@@ -817,7 +826,9 @@ class PSOAttack(object):
 
                         # TODO: apply attack to test generated images...
                         print(f"{filename}: 【{itr}/{self.max_iter}】 i-{i} Success all: g_fitness: {self.g_best_fitness}, p_fitness: {self.p_best_fitness[i]}, prediction: {pred_labels[success_indicator.cpu().data.numpy()][0]}, probability: {fitness_score[success_indicator.cpu().data.numpy()][0]}")
-                        return True
+                        is_find_search = True
+                        if self.early_stopping:
+                            return is_find_search
                     # elif succeeded_pops.max() == self.best_pop_on_src_and_diffusoin_count_imgs_success:
                     #     g_fitness, p_best_idx, g_fitness_real = self.compute_best_pop_params_with_diffusion_imgs_in_equal_state(
                     #         fitness_score, self.pops[i], success_indicator_index)
@@ -838,7 +849,9 @@ class PSOAttack(object):
                     # Image.fromarray(image2saved_).save(fr'{self.save_dir}/{filename}.png')
                     print(
                         f"{filename}: 【{itr}/{self.max_iter}】 i-{i} Success: g_fitness: {self.g_best_fitness}, p_fitness: {self.p_best_fitness[i]}, prediction: {pred_labels[success_indicator.cpu().data.numpy()][0]}, probability: {fitness_score[success_indicator.cpu().data.numpy()][0]}")
-                    return True
+                    is_find_search = True
+                    if self.early_stopping:
+                        return is_find_search
             else:
 
                 if diffusion_imgs is not None:
@@ -872,7 +885,7 @@ class PSOAttack(object):
                 else:
                     print(f"{filename}:【{itr}/{self.max_iter}】 i-{i} Failed: g_fitness: {self.g_best_fitness}, g_fitness_real: {self.sg_best_fitness}, p_fitness: {self.p_best_fitness[i]}, prediction: {pred_labels[0]}, probability: {fitness_score[0]}")
 
-        return False
+        return is_find_search   # usually if early_stopping is True and we got here, we return False
 
     def get_diffusion_score_min_and_sum_of_failed_attack(self, fitness_score, success_indicator_index):
         pass
@@ -971,8 +984,9 @@ class PSOAttack(object):
                 success_cnt += 1
                 print("Initial found!!!")
                 print("==" * 30)
-                self.save_adv_images(cropped_resized_img, orig_img, cropped_img, bbx, filename, attack_with_diffusion=attack_with_diffusion, diffusion_imgs=diffusion_imgs, main_itr = -1)
-                continue
+                self.save_adv_images(cropped_resized_img, orig_img, cropped_img, bbx, filename, attack_with_diffusion=attack_with_diffusion, diffusion_imgs=diffusion_imgs, main_itr=-1)
+                if self.early_stopping:
+                    continue
 
             for itr in range(self.max_iter):
                 if attack_with_diffusion:
@@ -987,9 +1001,14 @@ class PSOAttack(object):
                 if is_find_search:
                     success_cnt += 1
                     print("==" * 30)
-                    break
-
-            self.save_adv_images(cropped_resized_img, orig_img, cropped_img, bbx, filename, attack_with_diffusion=attack_with_diffusion, diffusion_imgs=diffusion_imgs, main_itr=itr)
+                    if self.early_stopping:
+                        break
+                    else:
+                        self.save_adv_images(cropped_resized_img, orig_img, cropped_img, bbx, filename,
+                                             attack_with_diffusion=attack_with_diffusion, diffusion_imgs=diffusion_imgs,
+                                             main_itr=itr)
+            if self.early_stopping:
+                self.save_adv_images(cropped_resized_img, orig_img, cropped_img, bbx, filename, attack_with_diffusion=attack_with_diffusion, diffusion_imgs=diffusion_imgs, main_itr=itr)
 
             if i==1:
                 break
@@ -1016,12 +1035,9 @@ class PSOAttack(object):
         if not diffusion_imgs:
             Image.fromarray(image2saved_).save(fr'{self.save_dir}/{filename}.png')
         else:
-            if attack_with_diffusion:
-                output_dir = diffusion_imgs.output_dir_special
-                output_dir_large = os.path.join(output_dir, 'large')
-                os.makedirs(output_dir_large, exist_ok=True)
-            else:
-                output_dir = diffusion_imgs.output_dir_normal
+            output_dir, output_dir_large = self.get_output_dirs_for_saving_test_imgs(attack_with_diffusion,
+                                                                                     diffusion_imgs,
+                                                                                     main_itr)
             print("output_dir: ", output_dir)
             os.makedirs(output_dir, exist_ok=True)
             Image.fromarray(image2saved_).save(f'{output_dir}/{filename}.png')
@@ -1071,6 +1087,23 @@ class PSOAttack(object):
             #     mask_attack = np.ones_like(diffusion_img) * 255
             #     cv2.fillPoly(mask_attack, adv_params[0].points, (0, 0, 0))
             #     cv2.imwrite(image_attack_mask_path, mask_attack)
+
+    def get_output_dirs_for_saving_test_imgs(self, attack_with_diffusion, diffusion_imgs, main_itr: int):
+        output_dir_large = None
+        if attack_with_diffusion:
+            if self.early_stopping:
+                output_dir = diffusion_imgs.output_dir_special
+            else:
+                output_dir = os.path.join(diffusion_imgs.output_dir_special, main_itr)
+            output_dir_large = os.path.join(output_dir, 'large')
+            os.makedirs(output_dir_large, exist_ok=True)
+        else:
+            if self.early_stopping:
+                output_dir = diffusion_imgs.output_dir_normal
+            else:
+                output_dir = os.path.join(diffusion_imgs.output_dir_normal, main_itr)
+
+        return output_dir, output_dir_large
 
     @timeit
     def generate_diffusion_images_conatining_attack(self, adv_images, src_orig_image, src_cropped_image, bbx,
@@ -1464,7 +1497,8 @@ def main():
                     logs_dir=log_dir,
                     device=device,
                     generator_seed=args.generator_seed,
-                    generator = get_generator(args.generator_seed) if args.diffusion_model_local else None
+                    generator = get_generator(args.generator_seed) if args.diffusion_model_local else None,
+                    early_stopping = args.early_stopping
                     )
 
     # asr = pso.run_pso(file_names, orig_imgs, cropped_imgs, cropped_resized_imgs, labels, bbx, masks_cropped)

@@ -3,6 +3,7 @@ max_iter: 30  #200
 model_name: "LISA"
 dataset_name: "larger_images"
 output_dir: "experiments/RFLA_thesis_diffusion_A100_1"
+early_stopping: False
 diffusion_model_local: True
 generator_seed: 525901257
 attack_label: None
