@@ -4,6 +4,7 @@ model_name: "LISA"
 dataset_name: "larger_images"
 output_dir: "experiments/RFLA_thesis_diffusion_A100_1"
 diffusion_model_local: True
+generator_seed: 525901257
 attack_label: None
 is_adv_model: False
 plot_pairs: True
